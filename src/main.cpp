@@ -1,4 +1,5 @@
 #include "main.h"
+#include "robot-config.h"
 
 /**
  * A callback function for LLEMU's center button.
@@ -22,8 +23,20 @@ void on_center_button() {
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
+pros::Optical optical_sensor(1);
 void initialize() {
 	pros::lcd::initialize();
+	optical_sensor.set_led_pwm(100);
+
+	pros::Task print_task([]() {
+		while (true) {
+			pros::lcd::print(0, "Hue: %.1f", optical_sensor.get_hue());
+			pros::lcd::print(1, "Prox: %d", optical_sensor.get_proximity());
+			pros::lcd::print(2, "Brightness: %.2f", optical_sensor.get_brightness());
+			pros::delay(20);
+		}
+	});
+
 	pros::lcd::set_text(1, "Hello PROS User!");
 
 	pros::lcd::register_btn1_cb(on_center_button);
@@ -75,20 +88,20 @@ void autonomous() {}
  */
 void opcontrol() {
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
-	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
-
+	bool claw_open = false;
 
 	while (true) {
-		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
+		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
-		// Arcade control scheme
-		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
-		left_mg.move(dir - turn);                      // Sets left motor voltage
-		right_mg.move(dir + turn);                     // Sets right motor voltage
-		pros::delay(20);                               // Run for 20 ms then update
+		left_motors.move(dir + turn);
+		right_motors.move(dir - turn);
+
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) {
+			claw_open = !claw_open;
+			claw_piston.set_value(claw_open);
+		}
+
+		pros::delay(20);
 	}
 }
