@@ -23,7 +23,6 @@ void on_center_button() {
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
-pros::Optical optical_sensor(1);
 void initialize() {
 	pros::lcd::initialize();
 	optical_sensor.set_led_pwm(100);
@@ -71,7 +70,62 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-void autonomous() {}
+// Drives both sides at the given voltage (-127 to 127) for the given time, then stops.
+void drive_for(int voltage, int duration_ms) {
+	left_motors.move(voltage);
+	right_motors.move(voltage);
+	pros::delay(duration_ms);
+	left_motors.move(0);
+	right_motors.move(0);
+}
+
+// Turns in place: positive voltage turns right, negative turns left.
+void turn_for(int voltage, int duration_ms) {
+	left_motors.move(voltage);
+	right_motors.move(-voltage);
+	pros::delay(duration_ms);
+	left_motors.move(0);
+	right_motors.move(0);
+}
+
+void autonomous() {
+	// === STRATEGY: Toggles first, then yellow Pins ===
+	// Yellow Pins only score points if the Quadrant's Toggle is set to our
+	// Alliance color (rule SC5). Setting our Toggle(s) first is required
+	// before any yellow Pin scoring counts for us.
+	// Reference: Autonomous Win Point (SC8) needs 7+ Pins scored for us and
+	// 3+ Goals with 2+ Pins each, using only our side of the Autonomous Line.
+
+	// --- Step 1: Score the Preload ---
+	// Every robot starts with one Pin (SG5). Score it first, it's guaranteed
+	// points with no searching needed.
+	// TODO: once claw/intake mechanism is finalized, add code here to
+	// deposit the preload into the nearest Goal.
+
+	// --- Step 2: Set our Quadrant Toggle(s) to our Alliance color ---
+	// TODO: drive to Toggle, use claw/mechanism to flip it to our color.
+	// A Toggle only counts as "set" if it's fully seated and not touching
+	// a Robot at rest (SC4), so don't linger in contact with it after flipping.
+	// drive_for(...);
+	// turn_for(...);
+
+	// --- Step 3: Collect and score yellow Pins (now Owned by us) ---
+	// Only do this AFTER Step 2, otherwise these Pins score zero (SC5a).
+	// TODO: pick up yellow Pins, drive to a Goal on our side, score them.
+
+	// --- Step 4: If time remains, score additional red/blue Alliance Pins ---
+	// These always count for us regardless of Toggle state (SC3a/b), so
+	// they're a safe fallback if Toggle-flipping or yellow Pins fail/run out
+	// of time.
+	// TODO: add once intake mechanism is finalized.
+
+	// === RULES TO NEVER VIOLATE DURING THIS PERIOD ===
+	// - Never cross the Autonomous Line (SG7) — any Violation auto-awards
+	//   the Autonomous Bonus to the opponent (SC7c).
+	// - Stay off Midfield unless intentional — Midfield scoring doesn't
+	//   count toward the Autonomous Bonus anyway (SC7a), so it's not worth
+	//   the risk during auto.
+}
 
 /**
  * Runs the operator control code. This function will be started in its own task
