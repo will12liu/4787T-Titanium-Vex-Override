@@ -19,6 +19,7 @@ constexpr int CLAW_TURN_VELOCITY = 60;
 
 
 void opcontrol() {
+	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 	bool claw_open = false;
     claw_turn.tare_position();
@@ -51,7 +52,9 @@ void opcontrol() {
 		// Banshee claw pneumatic: X toggles
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
 			claw_open = !claw_open;
+#if USE_CLAW_PISTON
 			claw_piston.set_value(claw_open);
+#endif
 		}
 
 		// Banshee claw spin motor: Y spins in, A spins out

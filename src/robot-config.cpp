@@ -18,7 +18,9 @@ pros::Motor claw_spin(7, pros::MotorGears::green);
 
 
 // PLACEHOLDER PORT — update once build team confirms ADI wiring
+#if USE_CLAW_PISTON
 pros::adi::Pneumatics claw_piston(8, false);
+#endif
 
 pros::Imu imu (9);
 pros::Motor intake_motor(10, pros::MotorGears::green);

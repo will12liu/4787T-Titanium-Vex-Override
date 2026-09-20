@@ -13,7 +13,9 @@ static void drive_for(int voltage, int duration_ms) {
 void autonomous() {
 	// Basic time-based auto. Voltages/durations are untuned guesses.
 	drive_for(90, 800);
+#if USE_CLAW_PISTON
 	claw_piston.set_value(true);
+#endif
 	pros::delay(300);
 	drive_for(-90, 800);
 }

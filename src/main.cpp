@@ -1,36 +1,15 @@
 #include "main.h"
 #include "robot-config.h"
 
-/**
- * A callback function for LLEMU's center button.
- *
- * When this callback is fired, it will toggle line 2 of the LCD text between
- * "I was pressed!" and nothing.
- */
-void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
-	} else {
-		pros::lcd::clear_line(2);
-	}
-}
-
-/**
- * Runs initialization code. This occurs as soon as the program is started.
- *
- * All other competition modes are blocked by initialize; it is recommended
- * to keep execution time for this mode under a few seconds.
- */
 void initialize() {
-	pros::lcd::initialize();
-	//optical_sensor.set_led_pwm(100);
-
-	// Port check for smart ports 1-14. M=motor I=imu R=rotation D=distance -=nothing
-	// Any mismatch between "code expects" and "brain sees" means wrong port or loose cable.
+	// Uses pros::screen (not pros::lcd). Shows expected vs. seen devices on smart ports 1-14:
+	// M=motor I=imu R=rotation D=distance -=nothing. A mismatch means wrong port or loose cable.
 	pros::Task port_check_task([]() {
 		const char* expected = "MMMMMMM-IMDRRR";
+		pros::Controller master(pros::E_CONTROLLER_MASTER);
+		pros::delay(300);
+		master.set_text(0, 0, "init ran");
+		pros::screen::set_pen(pros::Color::white);
 		while (true) {
 			char seen[15];
 			for (int i = 0; i < 14; i++) {
@@ -44,9 +23,9 @@ void initialize() {
 				}
 			}
 			seen[14] = '\0';
-			pros::lcd::print(0, "ports  12345678901234");
-			pros::lcd::print(1, "expect %s", expected);
-			pros::lcd::print(2, "brain  %s", seen);
+			pros::screen::print(pros::E_TEXT_MEDIUM, 1, "ports  12345678901234");
+			pros::screen::print(pros::E_TEXT_MEDIUM, 2, "expect %s", expected);
+			pros::screen::print(pros::E_TEXT_MEDIUM, 3, "brain  %s", seen);
 			pros::delay(200);
 		}
 	});
