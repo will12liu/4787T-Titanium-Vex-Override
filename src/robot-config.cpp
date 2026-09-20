@@ -24,6 +24,7 @@ pros::Imu imu (9);
 pros::Motor intake_motor(10, pros::MotorGears::green);
 
 
+#if USE_LEMLIB_ODOM
 // PLACEHOLDER VALUES — track width and wheel diameter are guesses until
 // chassis dimensions are locked. Update once build team finalizes chassis.
 lemlib::Drivetrain drivetrain(
@@ -83,4 +84,6 @@ pros::Rotation claw_rotation(14);
 lemlib::TrackingWheel vertical_tracking_wheel(&vertical_rotation, lemlib::Omniwheel::NEW_2, -1);
 lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_rotation, lemlib::Omniwheel::NEW_2, -1);
 lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
+#endif
+
 bool claw_turn_horizontal = false;
