@@ -27,18 +27,29 @@ void initialize() {
 	pros::lcd::initialize();
 	//optical_sensor.set_led_pwm(100);
 
-	pros::Task print_task([]() {
+	// Port check for smart ports 1-14. M=motor I=imu R=rotation D=distance -=nothing
+	// Any mismatch between "code expects" and "brain sees" means wrong port or loose cable.
+	pros::Task port_check_task([]() {
+		const char* expected = "MMMMMMM-IMDRRR";
 		while (true) {
-			//pros::lcd::print(0, "Hue: %.1f", optical_sensor.get_hue());
-			//pros::lcd::print(1, "Prox: %d", optical_sensor.get_proximity());
-			//pros::lcd::print(2, "Brightness: %.2f", optical_sensor.get_brightness());
-			pros::delay(20);
+			char seen[15];
+			for (int i = 0; i < 14; i++) {
+				switch (pros::Device::get_plugged_type(i + 1)) {
+					case pros::DeviceType::motor: seen[i] = 'M'; break;
+					case pros::DeviceType::imu: seen[i] = 'I'; break;
+					case pros::DeviceType::rotation: seen[i] = 'R'; break;
+					case pros::DeviceType::distance: seen[i] = 'D'; break;
+					case pros::DeviceType::none: seen[i] = '-'; break;
+					default: seen[i] = '?'; break;
+				}
+			}
+			seen[14] = '\0';
+			pros::lcd::print(0, "ports  12345678901234");
+			pros::lcd::print(1, "expect %s", expected);
+			pros::lcd::print(2, "brain  %s", seen);
+			pros::delay(200);
 		}
 	});
-
-	pros::lcd::set_text(1, "Hello PROS User!");
-
-	pros::lcd::register_btn1_cb(on_center_button);
 }
 
 /**
@@ -70,22 +81,4 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-// Drives both sides at the given voltage (-127 to 127) for the given time, then stops.
-void drive_for(int voltage, int duration_ms) {
-	left_motors.move(voltage);
-	right_motors.move(voltage);
-	pros::delay(duration_ms);
-	left_motors.move(0);
-	right_motors.move(0);
-}
-
-// Turns in place: positive voltage turns right, negative turns left.
-void turn_for(int voltage, int duration_ms) {
-	left_motors.move(voltage);
-	right_motors.move(-voltage);
-	pros::delay(duration_ms);
-	left_motors.move(0);
-	right_motors.move(0);
-}
-
 
