@@ -13,8 +13,8 @@
 pros::MotorGroup left_motors({1, 2}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({-3, -4}, pros::MotorGears::blue);
 pros::Motor cascade_motor(5, pros::MotorGears::green);
-pros::Motor claw_turn(6, pros::MotorGears::green);
-pros::Motor claw_spin(7, pros::MotorGears::green);
+pros::Motor claw_turn(-6, pros::MotorGears::green);
+pros::Motor claw_spin(20, pros::MotorGears::green);
 
 
 // PLACEHOLDER PORT — update once build team confirms ADI wiring
@@ -22,8 +22,8 @@ pros::Motor claw_spin(7, pros::MotorGears::green);
 pros::adi::Pneumatics claw_piston(8, false);
 #endif
 
-pros::Imu imu (9);
-pros::Motor intake_motor(10, pros::MotorGears::green);
+pros::Imu imu (10);
+pros::Motor intake_motor(9「‘」」」」」」」」」」」」」」」」」」」」」」」」」」」」」」」」, pros::MotorGears::green);
 
 
 #if USE_LEMLIB_ODOM

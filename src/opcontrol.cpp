@@ -1,8 +1,9 @@
 #include "main.h"
 #include "robot-config.h"
-constexpr double CLAW_TURN_VERTICAL_DEG = 0.0;
-constexpr double CLAW_TURN_HORIZONTAL_DEG = 100.0;
-constexpr int CLAW_TURN_VELOCITY = 60;
+constexpr double CLAW_TURN_VERTICAL_DEG = 60.0;
+constexpr double CLAW_TURN_HORIZONTAL_DEG = 1000.0;
+constexpr int CLAW_TURN_VELOCITY = 200.0;
+constexpr int CLAW_TURN_DOWN_VELOCITY = 100.0;
 /**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
@@ -22,6 +23,9 @@ void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 	bool claw_open = false;
+	bool intake_running = false;
+	bool claw_spin_in = false;
+	bool claw_spin_out = false;	
     claw_turn.tare_position();
 
 	while (true) {
@@ -32,13 +36,24 @@ void opcontrol() {
 		right_motors.move(dir - turn);
 
 		// Intake: R1 in, R2 out
-		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
-			intake_motor.move(127);
-		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
-			intake_motor.move(-127);
-		} else {
-			intake_motor.move(0);
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1)) {
+    		intake_running = !intake_running;
 		}
+		if (intake_running) {
+    intake_motor.move(127);
+} else {
+    intake_motor.move(0);
+}
+
+		/** 
+		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
+				intake_motor.move(-127);
+			} else if (intake_running) {
+				intake_motor.move(127);
+			} else {
+				intake_motor.move(0);
+		}
+				*/
 
 		// Cascade: L1 up, L2 down
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
@@ -57,19 +72,29 @@ void opcontrol() {
 #endif
 		}
 
-		// Banshee claw spin motor: Y spins in, A spins out
-		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_Y)) {
-			claw_spin.move(127);
-		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_A)) {
-			claw_spin.move(-127);
-		} else {
-			claw_spin.move(0);
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
+			claw_spin_in = !claw_spin_in;
+			claw_spin_out = false;
 		}
+
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
+			claw_spin_out = !claw_spin_out;
+			claw_spin_in = false;
+		}
+			if (claw_spin_in) {
+				claw_turn.move(127);
+			} else if (claw_spin_out) {
+				claw_turn.move(-127);
+			} else {
+				claw_turn.move(0);
+			}
+
         //Turn Banshee Claw up: press B, press again to return
         if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-            claw_turn_horizontal = !claw_turn_horizontal;
-            double target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
-            claw_turn.move_absolute(target, CLAW_TURN_VELOCITY);
+			claw_turn_horizontal = !claw_turn_horizontal;
+			double target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
+			int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
+			claw_turn.move_absolute(target, velocity);
 }
        
 
