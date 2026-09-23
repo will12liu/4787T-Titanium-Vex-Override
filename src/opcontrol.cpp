@@ -29,21 +29,33 @@ void opcontrol() {
     claw_turn.tare_position();
 
 	while (true) {
-		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+		// 1. Drivetrain (tank/arcade, omni wheels)
+			int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+			int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
-		left_motors.move(dir + turn);
-		right_motors.move(dir - turn);
+			// Deadband: kill stick noise near center
+			if (std::abs(dir) < 10) dir = 0;
+			if (std::abs(turn) < 10) turn = 0;
+
+			int left = dir + turn;
+			int right = dir - turn;
+
+			// Clamp: keep summed values in valid motor range
+			left = std::clamp(left, -127, 127);
+			right = std::clamp(right, -127, 127);
+
+			left_motors.move(left);
+			right_motors.move(right);
 
 		// Intake: R1 in, R2 out
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1)) {
     		intake_running = !intake_running;
 		}
 		if (intake_running) {
-    intake_motor.move(127);
-} else {
-    intake_motor.move(0);
-}
+			intake_motor.move(127);
+		} else {
+			intake_motor.move(0);
+		}
 
 		/** 
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
@@ -57,11 +69,11 @@ void opcontrol() {
 
 		// Cascade: L1 up, L2 down
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
-			cascade_motor.move(127);
+			cascade.move(127);
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-			cascade_motor.move(-127);
+			cascade.move(-127);
 		} else {
-			cascade_motor.move(0);
+			cascade.move(0);
 		}
 
 		// Banshee claw pneumatic: X toggles
