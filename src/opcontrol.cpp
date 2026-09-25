@@ -30,6 +30,7 @@ void opcontrol() {
 	bool cascade_holding = false;
 	double cascade_hold_pos = 0.0;
 	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+	double claw_turn_target = 0.0; 
 
 	while (true) {
 		// 1. Drivetrain (tank/arcade, omni wheels)
@@ -112,14 +113,16 @@ void opcontrol() {
 
         //Turn Banshee Claw up: press B, press again to return
         if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			claw_turn_horizontal = !claw_turn_horizontal;
-			double target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
-			int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
-			claw_turn.move_absolute(target, velocity);
+	claw_turn_horizontal = !claw_turn_horizontal;
+	claw_turn_target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
+}
+
+// Re-issue every loop so the motor's position PID keeps fighting gravity
+int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
+claw_turn.move_absolute(claw_turn_target, velocity);
 }
        
 
 
 		pros::delay(20);
 	}
-}
