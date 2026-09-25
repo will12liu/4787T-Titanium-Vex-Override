@@ -27,6 +27,9 @@ void opcontrol() {
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;	
     claw_turn.tare_position();
+	bool cascade_holding = false;
+	double cascade_hold_pos = 0.0;
+	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 
 	while (true) {
 		// 1. Drivetrain (tank/arcade, omni wheels)
@@ -70,10 +73,16 @@ void opcontrol() {
 		// Cascade: L1 up, L2 down
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
 			cascade.move(127);
+			cascade_holding = false;
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
 			cascade.move(-127);
+			cascade_holding = false;
 		} else {
-			cascade.move(0);
+			if (!cascade_holding) {
+				cascade_hold_pos = cascade.get_position();
+				cascade_holding = true;
+			}
+			cascade.move_absolute(cascade_hold_pos, 100);
 		}
 
 		// Banshee claw pneumatic: X toggles
