@@ -85,21 +85,15 @@ void opcontrol() {
 		}
 
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
-			claw_spin_in = !claw_spin_in;
-			claw_spin_out = false;
-		}
-
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
-			claw_spin_out = !claw_spin_out;
-			claw_spin_in = false;
-		}
-			if (claw_spin_in) {
-				claw_turn.move(127);
-			} else if (claw_spin_out) {
-				claw_turn.move(-127);
-			} else {
-				claw_turn.move(0);
-			}
+	claw_spin_in = !claw_spin_in;
+	claw_spin_out = false;
+	claw_turn.move(claw_spin_in ? 127 : 0);
+}
+if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
+	claw_spin_out = !claw_spin_out;
+	claw_spin_in = false;
+	claw_turn.move(claw_spin_out ? -127 : 0);
+}
 
         //Turn Banshee Claw up: press B, press again to return
         if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
