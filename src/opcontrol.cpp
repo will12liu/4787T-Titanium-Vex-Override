@@ -94,11 +94,11 @@ void opcontrol() {
 			claw_spin_in = false;
 		}
 			if (claw_spin_in) {
-				claw_turn.move(127);
+				claw_spin.move(127);
 			} else if (claw_spin_out) {
-				claw_turn.move(-127);
+				claw_spin.move(-60);
 			} else {
-				claw_turn.move(0);
+				claw_spin.move(0);
 			}
 
         //Turn Banshee Claw up: press B, press again to return

@@ -14,7 +14,7 @@ pros::MotorGroup left_motors({1,2}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({-3,-4}, pros::MotorGears::blue);
 pros::MotorGroup cascade ({5,-6}, pros::MotorGears::green);
 
-pros::Motor claw_turn(-7, pros::MotorGears::green);
+pros::Motor claw_turn(-13, pros::MotorGears::green);
 pros::Motor claw_spin(8, pros::MotorGears::green);
 
 
