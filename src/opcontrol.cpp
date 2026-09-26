@@ -30,7 +30,7 @@ void opcontrol() {
 	bool cascade_holding = false;
 	double cascade_hold_pos = 0.0;
 	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-	double claw_turn_target = 0.0; 
+	double claw_turn_target = CLAW_TURN_VERTICAL_DEG; 
 
 	while (true) {
 		// 1. Drivetrain (tank/arcade, omni wheels)
@@ -85,15 +85,6 @@ void opcontrol() {
 			}
 			cascade.move_absolute(cascade_hold_pos, 100);
 		}
-
-		// Banshee claw pneumatic: X toggles
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
-			claw_open = !claw_open;
-#if USE_CLAW_PISTON
-			claw_piston.set_value(claw_open);
-#endif
-		}
-
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
 			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
@@ -103,26 +94,59 @@ void opcontrol() {
 			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
 		}
-			if (claw_spin_in) {
-				claw_spin.move(127);
-			} else if (claw_spin_out) {
-				claw_spin.move(-60);
-			} else {
-				claw_spin.move(0);
+		if (claw_spin_in) {
+			claw_spin.move(127);
+		} else if (claw_spin_out) {
+			claw_spin.move(-60);
+		} else {
+			claw_spin.move(0);
+		}
+
+		bool x_new = master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X);
+		bool b_new = master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
+		bool x_held = master.get_digital(pros::E_CONTROLLER_DIGITAL_X);
+		bool b_held = master.get_digital(pros::E_CONTROLLER_DIGITAL_B);
+
+		// Combo: X + B together -> raise claw to horizontal AND open claw at once
+		bool combo = (x_new && b_held) || (b_new && x_held);
+
+		if (combo) {
+			claw_turn_horizontal = true;
+			claw_turn_target = CLAW_TURN_HORIZONTAL_DEG;
+			claw_open = true;
+		#if USE_CLAW_PISTON
+			claw_piston.set_value(claw_open);
+		#endif
+		} else {
+			if (x_new) {
+				claw_open = !claw_open;
+		#if USE_CLAW_PISTON
+				claw_piston.set_value(claw_open);
+		#endif
 			}
+			if (b_new) {
+				claw_turn_horizontal = !claw_turn_horizontal;
+				claw_turn_target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
 
-        //Turn Banshee Claw up: press B, press again to return
-        if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-	claw_turn_horizontal = !claw_turn_horizontal;
-	claw_turn_target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
-}
+				// Going back down: also close the claw
+				if (!claw_turn_horizontal) {
+					claw_open = false;
+			#if USE_CLAW_PISTON
+					claw_piston.set_value(claw_open);
+			#endif
+				}
+				}
+		}
 
-// Re-issue every loop so the motor's position PID keeps fighting gravity
-int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
-claw_turn.move_absolute(claw_turn_target, velocity);
-}
+			
+
+			// Re-issue every loop so the motor's position PID keeps fighting gravity
+			int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
+			claw_turn.move_absolute(claw_turn_target, velocity);
+			pros::delay(20);
+		}
        
 
 
-		pros::delay(20);
+		
 	}
