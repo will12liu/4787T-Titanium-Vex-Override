@@ -4,6 +4,7 @@ constexpr double CLAW_TURN_VERTICAL_DEG = 60.0;
 constexpr double CLAW_TURN_HORIZONTAL_DEG = 1000.0;
 constexpr int CLAW_TURN_VELOCITY = 200.0;
 constexpr int CLAW_TURN_DOWN_VELOCITY = 100.0;
+
 /**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
@@ -72,13 +73,15 @@ void opcontrol() {
 				*/
 
 		// Cascade: L1 up, L2 down
+		
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
 			cascade.move(127);
 			cascade_holding = false;
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
 			cascade.move(-127);
 			cascade_holding = false;
-		} else {
+		} 
+		else {
 			if (!cascade_holding) {
 				cascade_hold_pos = cascade.get_position();
 				cascade_holding = true;
