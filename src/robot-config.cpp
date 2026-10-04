@@ -33,7 +33,7 @@ lemlib::Drivetrain drivetrain(
     &left_motors,
     &right_motors,
     10.748f,                          // track width (inches), PLACEHOLDER
-    3.14f,    // wheel diameter, PLACEHOLDER
+    3.25f,    // wheel diameter, PLACEHOLDER
     600,                         // drivetrain rpm
     2                            // horizontal drift compensation
 );
