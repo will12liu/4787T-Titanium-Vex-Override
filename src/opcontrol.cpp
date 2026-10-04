@@ -1,9 +1,7 @@
 #include "main.h"
 #include "robot-config.h"
-constexpr double CLAW_TURN_VERTICAL_DEG = 60.0;
-constexpr double CLAW_TURN_HORIZONTAL_DEG = 1000.0;
-constexpr int CLAW_TURN_VELOCITY = 200.0;
-constexpr int CLAW_TURN_DOWN_VELOCITY = 100.0;
+#include "mechanisms.h"   // CLAW_TURN_* constants live here now, shared with autonomous
+#include "auton.h"
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -27,13 +25,32 @@ void opcontrol() {
 	bool intake_running = false;
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;	
-    claw_turn.tare_position();
+	// claw_turn is tared once at boot in mech_init(); re-taring here would
+	// shift the flip targets after autonomous.
 	bool cascade_holding = false;
 	double cascade_hold_pos = 0.0;
 	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 	double claw_turn_target = CLAW_TURN_VERTICAL_DEG; 
 
 	while (true) {
+		// Auton test: D-pad DOWN runs autonomous() once. Only works with no
+		// competition switch / field control plugged in, so it can't fire in a match.
+		if (!pros::competition::is_connected() &&
+		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
+			autonomous();
+			claw_open = false;           // auton ends with the claw closed
+			claw_turn_target = CLAW_TURN_VERTICAL_DEG;
+			cascade_holding = false;     // re-capture the lift position after auton moved it
+			intake_running = false;
+			claw_spin_in = false;
+			claw_spin_out = false;
+		}
+		// Drive-only test: R2 runs the selected auton's driving with no lift or claw.
+		if (!pros::competition::is_connected() &&
+		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) {
+			auton_drive_test();
+		}
+
 		// 1. Drivetrain (tank/arcade, omni wheels)
 			int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 			int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);

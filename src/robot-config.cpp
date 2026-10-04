@@ -27,14 +27,13 @@ pros::Motor intake_motor(18, pros::MotorGears::green);
 
 
 #if USE_LEMLIB_ODOM
-// PLACEHOLDER VALUES — track width and wheel diameter are guesses until
-// chassis dimensions are locked. Update once build team finalizes chassis.
+// Measured on the robot.
 lemlib::Drivetrain drivetrain(
     &left_motors,
     &right_motors,
-    10.748f,                          // track width (inches), PLACEHOLDER
-    3.25f,    // wheel diameter, PLACEHOLDER
-    600,                         // drivetrain rpm
+    11.02f,                      // track width (inches), measured 28 cm
+    lemlib::Omniwheel::NEW_325,  // 3.25" omni wheels
+    600,                         // drivetrain rpm, direct drive blue
     2                            // horizontal drift compensation
 );
 
@@ -66,7 +65,19 @@ lemlib::ControllerSettings angular_controller(
     0     // max acceleration slew
 );
 
-// Drivetrain-only odometry: no tracking wheels yet, IMU + motor encoders only
+#if USE_TRACKING_WHEELS
+// PLACEHOLDER PORTS — update once build team confirms wiring.
+// Chosen to avoid the IMU (11) and claw_turn (13).
+pros::Distance distance_sensor(15);
+pros::Rotation vertical_rotation(12);
+pros::Rotation horizontal_rotation(14);
+pros::Rotation claw_rotation(16);
+
+// PLACEHOLDER OFFSETS — update once tracking wheel mounting is finalized (offset is distance from tracking center, in inches)
+lemlib::TrackingWheel vertical_tracking_wheel(&vertical_rotation, lemlib::Omniwheel::NEW_2, -1);
+lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_rotation, lemlib::Omniwheel::NEW_2, -1);
+
+// Odometry: vertical + horizontal pods for distance, IMU for heading
 lemlib::OdomSensors sensors(
     &vertical_tracking_wheel,
     nullptr,
@@ -74,17 +85,18 @@ lemlib::OdomSensors sensors(
     nullptr,
     &imu
 );
+#else
+// Drivetrain-only odometry: no tracking wheels, LemLib uses the drive motor
+// encoders for distance and the IMU for heading.
+lemlib::OdomSensors sensors(
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    &imu
+);
+#endif
 
-pros::Distance distance_sensor(11);
-
-// PLACEHOLDER PORTS — update once build team confirms wiring
-pros::Rotation vertical_rotation(12);
-pros::Rotation horizontal_rotation(13);
-pros::Rotation claw_rotation(14);
-
-// PLACEHOLDER OFFSETS — update once tracking wheel mounting is finalized (offset is distance from tracking center, in inches)
-lemlib::TrackingWheel vertical_tracking_wheel(&vertical_rotation, lemlib::Omniwheel::NEW_2, -1);
-lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_rotation, lemlib::Omniwheel::NEW_2, -1);
 lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
 #endif
 

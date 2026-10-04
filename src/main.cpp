@@ -1,18 +1,53 @@
 #include "main.h"
 #include "robot-config.h"
+#include "mechanisms.h"
+#include "auton_selector.h"
+#include "auton.h"
+#include <cstdlib>
+
+namespace {
+
+constexpr int NUM_PORTS = 21;
+
+// Builds the expected device-type string for smart ports 1..21 from the
+// devices declared in robot-config.cpp, so it can't go stale when ports move.
+void build_expected(char* expected) {
+	for (int i = 0; i < NUM_PORTS; i++) expected[i] = '-';
+	expected[NUM_PORTS] = '\0';
+	auto mark = [&](int port, char c) {
+		port = std::abs(port);
+		if (port >= 1 && port <= NUM_PORTS) expected[port - 1] = c;
+	};
+	for (auto p : left_motors.get_port_all()) mark(p, 'M');
+	for (auto p : right_motors.get_port_all()) mark(p, 'M');
+	for (auto p : cascade.get_port_all()) mark(p, 'M');
+	mark(claw_turn.get_port(), 'M');
+	mark(claw_spin.get_port(), 'M');
+	mark(intake_motor.get_port(), 'M');
+	mark(imu.get_port(), 'I');
+#if USE_TRACKING_WHEELS
+	mark(distance_sensor.get_port(), 'D');
+	mark(vertical_rotation.get_port(), 'R');
+	mark(horizontal_rotation.get_port(), 'R');
+	mark(claw_rotation.get_port(), 'R');
+#endif
+}
+
+} // namespace
 
 void initialize() {
-	// Uses pros::screen (not pros::lcd). Shows expected vs. seen devices on smart ports 1-14:
+	// Uses pros::screen (not pros::lcd). Shows expected vs. seen devices on smart ports 1-21:
 	// M=motor I=imu R=rotation D=distance -=nothing. A mismatch means wrong port or loose cable.
 	pros::Task port_check_task([]() {
-		const char* expected = "MMMMMMM-IMDRRR";
+		char expected[NUM_PORTS + 1];
+		build_expected(expected);
 		pros::Controller master(pros::E_CONTROLLER_MASTER);
 		pros::delay(300);
 		master.set_text(0, 0, "init ran");
 		pros::screen::set_pen(pros::Color::white);
 		while (true) {
-			char seen[15];
-			for (int i = 0; i < 14; i++) {
+			char seen[NUM_PORTS + 1];
+			for (int i = 0; i < NUM_PORTS; i++) {
 				switch (pros::Device::get_plugged_type(i + 1)) {
 					case pros::DeviceType::motor: seen[i] = 'M'; break;
 					case pros::DeviceType::imu: seen[i] = 'I'; break;
@@ -22,13 +57,17 @@ void initialize() {
 					default: seen[i] = '?'; break;
 				}
 			}
-			seen[14] = '\0';
-			pros::screen::print(pros::E_TEXT_MEDIUM, 1, "ports  12345678901234");
+			seen[NUM_PORTS] = '\0';
+			pros::screen::print(pros::E_TEXT_MEDIUM, 1, "ports  123456789012345678901");
 			pros::screen::print(pros::E_TEXT_MEDIUM, 2, "expect %s", expected);
 			pros::screen::print(pros::E_TEXT_MEDIUM, 3, "brain  %s", seen);
 			pros::delay(200);
 		}
 	});
+
+	mech_init();             // tare lift + claw flip, set brake modes. Lift must be fully down.
+	auton_selector_start();  // LEFT / RIGHT buttons on the Brain + controller D-pad
+	auton_init();            // find IMU, calibrate LemLib chassis (blocks ~2-3 s)
 }
 
 /**
