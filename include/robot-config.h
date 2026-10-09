@@ -16,8 +16,15 @@ extern pros::MotorGroup cascade;
 
 // Dedicated tracking wheel pods + distance sensor + claw rotation sensor.
 // Off until they are physically mounted and ports/offsets are confirmed.
-// When on, odom switches from drive encoders to the pods automatically.
+// Turn this on once the horizontal pod is mounted and plugged in; with it on and
+// no pod, odom reads garbage.
 #define USE_TRACKING_WHEELS 0
+
+// Which pods exist (only matter when USE_TRACKING_WHEELS is 1). Forward/back
+// distance comes from the drive motor encoders unless the vertical pod is on.
+// Current plan: horizontal pod only, to catch sideways drift. Heading is the IMU.
+#define USE_VERTICAL_POD 0
+#define USE_HORIZONTAL_POD 1
 
 // Pneumatic claw. Off: the claw piston was replaced by aux_piston_a/b (D-pad UP).
 // Auton claw_set_open() does nothing while this is 0.
@@ -42,10 +49,18 @@ extern pros::Motor intake_motor;
 // Add drivetrain motors, IMU, other sensors here as the robot gets built
 #if USE_TRACKING_WHEELS
 extern pros::Distance distance_sensor;
+#if USE_VERTICAL_POD
 extern pros::Rotation vertical_rotation;
+#endif
+#if USE_HORIZONTAL_POD
 extern pros::Rotation horizontal_rotation;
+#endif
 extern pros::Rotation claw_rotation;
+#if USE_VERTICAL_POD
 extern lemlib::TrackingWheel vertical_tracking_wheel;
+#endif
+#if USE_HORIZONTAL_POD
 extern lemlib::TrackingWheel horizontal_tracking_wheel;
+#endif
 #endif
 extern bool claw_turn_horizontal;

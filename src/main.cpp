@@ -29,8 +29,12 @@ void build_expected(char* expected) {
 	mark(imu.get_port(), 'I');
 #if USE_TRACKING_WHEELS
 	mark(distance_sensor.get_port(), 'D');
+#if USE_VERTICAL_POD
 	mark(vertical_rotation.get_port(), 'R');
+#endif
+#if USE_HORIZONTAL_POD
 	mark(horizontal_rotation.get_port(), 'R');
+#endif
 	mark(claw_rotation.get_port(), 'R');
 #endif
 }
