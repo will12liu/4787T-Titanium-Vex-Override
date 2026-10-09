@@ -2,7 +2,7 @@
 
 // Pre-match autonomous selection: 4 autos (RED/BLUE x LEFT/RIGHT).
 // Four buttons on the Brain screen (touch), or controller D-pad LEFT / RIGHT
-// for side and D-pad UP to switch colour. Selection is shown on both.
+// for side and X to switch colour. Selection is shown on both.
 // Side: standing behind the robot looking into the field, which side our
 // alliance goal is on. LEFT = side-wall quadrant, RIGHT = quadrant in front
 // of our station.

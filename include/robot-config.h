@@ -19,14 +19,14 @@ extern pros::MotorGroup cascade;
 // When on, odom switches from drive encoders to the pods automatically.
 #define USE_TRACKING_WHEELS 0
 
-// Pneumatic claw. Off while bisecting a startup problem; set to 1 once air is plumbed.
-#define USE_CLAW_PISTON 1
+// Pneumatic claw. Off: the claw piston was replaced by aux_piston_a/b (D-pad UP).
+// Auton claw_set_open() does nothing while this is 0.
+#define USE_CLAW_PISTON 0
 
 extern pros::Motor claw_turn;
-#if USE_CLAW_PISTON
-extern pros::adi::Pneumatics claw_piston;
-#endif
 extern pros::Motor claw_spin;
+extern pros::adi::Pneumatics aux_piston_a;
+extern pros::adi::Pneumatics aux_piston_b;
 
 // PLACEHOLDER PORT — update once build team confirms IMU mounting/wiring
 extern pros::Imu imu;

@@ -68,11 +68,12 @@ void selector_task_fn() {
 			}
 		}
 
-		// Controller D-pad, only while not actually running autonomous.
+		// Controller: D-pad LEFT / RIGHT for side, X for colour (D-pad UP is the aux
+		// pistons in driver control). Only while not actually running autonomous.
 		if (!pros::competition::is_autonomous()) {
 			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) selected = AutonSide::LEFT;
 			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) selected = AutonSide::RIGHT;
-			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP)) {
+			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
 				selected_color = selected_color == AutonColor::RED ? AutonColor::BLUE : AutonColor::RED;
 			}
 		}

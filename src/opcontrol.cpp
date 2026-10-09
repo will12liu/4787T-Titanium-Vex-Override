@@ -23,16 +23,24 @@
 void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	bool claw_open = false;
 	bool intake_running = false;
 	bool claw_spin_in = false;
-	bool claw_spin_out = false;	
+	bool claw_spin_out = false;
+	bool aux_open = false;
 	// claw_turn is tared once at boot in mech_init(); re-taring here would
 	// shift the flip targets after autonomous.
 	// Cascade stays up on its own now, so no active hold: BRAKE just shorts the
 	// motor when stopped (no power), instead of HOLD fighting gravity.
 	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-	double claw_turn_target = CLAW_TURN_VERTICAL_DEG; 
+	// Claw turn states: 0 = down/vertical, 1 = horizontal, 2 = lifted off the cone
+	int claw_turn_state = 0;
+	// Lift is a fraction of the vertical-to-horizontal travel past horizontal.
+	// 0.5 = about 45 degrees if horizontal is 90 degrees from vertical. Use 0.33 to 0.67 for 30 to 60.
+	// The sign follows the vertical-to-horizontal direction. If it lifts the wrong way, use -0.5.
+	const double CLAW_LIFT_FRACTION = 0.5;
+	const double claw_turn_lift_deg = CLAW_TURN_HORIZONTAL_DEG +
+		(CLAW_TURN_HORIZONTAL_DEG - CLAW_TURN_VERTICAL_DEG) * CLAW_LIFT_FRACTION;
+	double claw_turn_target = CLAW_TURN_VERTICAL_DEG;
 
 	while (true) {
 		// Auton test: D-pad DOWN runs autonomous() once. Only works with no
@@ -40,14 +48,18 @@ void opcontrol() {
 		if (!pros::competition::is_connected() && !tuning_active() &&
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
 			autonomous();
-			claw_open = false;           // auton ends with the claw closed
+			claw_turn_state = 0;
 			claw_turn_target = CLAW_TURN_VERTICAL_DEG;
+			claw_turn_horizontal = false;
 			// E-stopped mid-run: leave the claw flip where it stopped instead of
 			// snapping it back to vertical as soon as driver control resumes.
 			if (estop_triggered()) claw_turn_target = claw_turn.get_position();
 			intake_running = false;
 			claw_spin_in = false;
 			claw_spin_out = false;
+			aux_open = false;
+			aux_piston_a.set_value(aux_open);
+			aux_piston_b.set_value(aux_open);
 		}
 		// Drive-only test: R2 runs the selected auton's driving with no lift or claw.
 		if (!pros::competition::is_connected() && !tuning_active() &&
@@ -55,54 +67,34 @@ void opcontrol() {
 			auton_drive_test();
 		}
 
-		// 1. Drivetrain (tank/arcade, omni wheels)
-			int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-			int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+		// 1. Drivetrain
+		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
-			// Deadband: kill stick noise near center
-			if (std::abs(dir) < 10) dir = 0;
-			if (std::abs(turn) < 10) turn = 0;
+		if (std::abs(dir) < 10) dir = 0;
+		if (std::abs(turn) < 10) turn = 0;
 
-			int left = dir + turn;
-			int right = dir - turn;
+		int left = std::clamp(dir + turn, -127, 127);
+		int right = std::clamp(dir - turn, -127, 127);
 
-			// Clamp: keep summed values in valid motor range
-			left = std::clamp(left, -127, 127);
-			right = std::clamp(right, -127, 127);
-
-			// Tuning screen open: leave the drivetrain to its tests.
-			if (!tuning_active()) {
-				left_motors.move(left);
-				right_motors.move(right);
-			}
+		// Tuning screen open: leave the drivetrain to its tests.
+		if (!tuning_active()) {
+			left_motors.move(left);
+			right_motors.move(right);
+		}
 
 		// L1 + R1 together is the E-STOP combo: ignore both for the lift and intake
 		// so stopping a test (or a tuning run) doesn't raise the lift or start the intake.
 		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) &&
 		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-		// Intake: R1 in, R2 out
+		// Intake: R1 toggles
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
-    		intake_running = !intake_running;
+			intake_running = !intake_running;
 		}
-		if (intake_running) {
-			intake_motor.move(127);
-		} else {
-			intake_motor.move(0);
-		}
-
-		/** 
-		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
-				intake_motor.move(-127);
-			} else if (intake_running) {
-				intake_motor.move(127);
-			} else {
-				intake_motor.move(0);
-		}
-				*/
+		intake_motor.move(intake_running ? 127 : 0);
 
 		// Cascade: L1 up, L2 down
-		
 		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !estop_combo) {
 			cascade.move(127);
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
@@ -110,11 +102,12 @@ void opcontrol() {
 		} else {
 			cascade.move(0);
 		}
+
+		// Claw spin: Y in, A out (toggles)
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
 			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
 		}
-
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
 			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
@@ -127,51 +120,29 @@ void opcontrol() {
 			claw_spin.move(0);
 		}
 
-		bool x_new = master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X);
-		bool b_new = master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
-		bool x_held = master.get_digital(pros::E_CONTROLLER_DIGITAL_X);
-		bool b_held = master.get_digital(pros::E_CONTROLLER_DIGITAL_B);
-
-		// Combo: X + B together -> raise claw to horizontal AND open claw at once
-		bool combo = (x_new && b_held) || (b_new && x_held);
-
-		if (combo) {
-			claw_turn_horizontal = true;
-			claw_turn_target = CLAW_TURN_HORIZONTAL_DEG;
-			claw_open = true;
-		#if USE_CLAW_PISTON
-			claw_piston.set_value(claw_open);
-		#endif
-		} else {
-			if (x_new) {
-				claw_open = !claw_open;
-		#if USE_CLAW_PISTON
-				claw_piston.set_value(claw_open);
-		#endif
+				// Claw turn: B cycles vertical -> horizontal -> lifted -> vertical
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
+			claw_turn_state = (claw_turn_state + 1) % 3;
+			if (claw_turn_state == 1) {
+				claw_turn_target = CLAW_TURN_HORIZONTAL_DEG;
+			} else if (claw_turn_state == 2) {
+				claw_turn_target = claw_turn_lift_deg;
+			} else {
+				claw_turn_target = CLAW_TURN_VERTICAL_DEG;
 			}
-			if (b_new) {
-				claw_turn_horizontal = !claw_turn_horizontal;
-				claw_turn_target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
-
-				// Going back down: also close the claw
-				if (!claw_turn_horizontal) {
-					claw_open = false;
-			#if USE_CLAW_PISTON
-					claw_piston.set_value(claw_open);
-			#endif
-				}
-				}
+			claw_turn_horizontal = (claw_turn_state != 0);  // keep shared flag in sync with auton
 		}
 
-			
-
-			// Re-issue every loop so the motor's position PID keeps fighting gravity
-			int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
-			claw_turn.move_absolute(claw_turn_target, velocity);
-			pros::delay(20);
+		// Two aux pistons: D-pad UP toggles open/close together
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP)) {
+			aux_open = !aux_open;
+			aux_piston_a.set_value(aux_open);
+			aux_piston_b.set_value(aux_open);
 		}
-       
 
-
-		
+		// Re-issue every loop so the motor's position PID keeps fighting gravity
+		int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
+		claw_turn.move_absolute(claw_turn_target, velocity);
+		pros::delay(20);
 	}
+}
