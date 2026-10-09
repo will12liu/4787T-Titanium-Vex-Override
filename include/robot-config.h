@@ -23,10 +23,9 @@ extern pros::MotorGroup cascade;
 #define USE_CLAW_PISTON 1
 
 extern pros::Motor claw_turn;
-#if USE_CLAW_PISTON
-extern pros::adi::Pneumatics claw_piston;
-#endif
 extern pros::Motor claw_spin;
+extern pros::adi::Pneumatics aux_piston_a;
+extern pros::adi::Pneumatics aux_piston_b;
 
 // PLACEHOLDER PORT — update once build team confirms IMU mounting/wiring
 extern pros::Imu imu;
