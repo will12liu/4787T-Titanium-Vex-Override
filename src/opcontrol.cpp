@@ -2,6 +2,8 @@
 #include "robot-config.h"
 #include "mechanisms.h"   // CLAW_TURN_* constants live here now, shared with autonomous
 #include "auton.h"
+#include "tuning.h"
+#include "estop.h"
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -27,26 +29,28 @@ void opcontrol() {
 	bool claw_spin_out = false;	
 	// claw_turn is tared once at boot in mech_init(); re-taring here would
 	// shift the flip targets after autonomous.
-	bool cascade_holding = false;
-	double cascade_hold_pos = 0.0;
-	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+	// Cascade stays up on its own now, so no active hold: BRAKE just shorts the
+	// motor when stopped (no power), instead of HOLD fighting gravity.
+	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
 	double claw_turn_target = CLAW_TURN_VERTICAL_DEG; 
 
 	while (true) {
 		// Auton test: D-pad DOWN runs autonomous() once. Only works with no
 		// competition switch / field control plugged in, so it can't fire in a match.
-		if (!pros::competition::is_connected() &&
+		if (!pros::competition::is_connected() && !tuning_active() &&
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
 			autonomous();
 			claw_open = false;           // auton ends with the claw closed
 			claw_turn_target = CLAW_TURN_VERTICAL_DEG;
-			cascade_holding = false;     // re-capture the lift position after auton moved it
+			// E-stopped mid-run: leave the claw flip where it stopped instead of
+			// snapping it back to vertical as soon as driver control resumes.
+			if (estop_triggered()) claw_turn_target = claw_turn.get_position();
 			intake_running = false;
 			claw_spin_in = false;
 			claw_spin_out = false;
 		}
 		// Drive-only test: R2 runs the selected auton's driving with no lift or claw.
-		if (!pros::competition::is_connected() &&
+		if (!pros::competition::is_connected() && !tuning_active() &&
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) {
 			auton_drive_test();
 		}
@@ -66,11 +70,19 @@ void opcontrol() {
 			left = std::clamp(left, -127, 127);
 			right = std::clamp(right, -127, 127);
 
-			left_motors.move(left);
-			right_motors.move(right);
+			// Tuning screen open: leave the drivetrain to its tests.
+			if (!tuning_active()) {
+				left_motors.move(left);
+				right_motors.move(right);
+			}
+
+		// L1 + R1 together is the E-STOP combo: ignore both for the lift and intake
+		// so stopping a test (or a tuning run) doesn't raise the lift or start the intake.
+		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) &&
+		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
 		// Intake: R1 in, R2 out
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1)) {
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
     		intake_running = !intake_running;
 		}
 		if (intake_running) {
@@ -91,19 +103,12 @@ void opcontrol() {
 
 		// Cascade: L1 up, L2 down
 		
-		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !estop_combo) {
 			cascade.move(127);
-			cascade_holding = false;
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-			cascade.move(-127);
-			cascade_holding = false;
-		} 
-		else {
-			if (!cascade_holding) {
-				cascade_hold_pos = cascade.get_position();
-				cascade_holding = true;
-			}
-			cascade.move_absolute(cascade_hold_pos, 100);
+			cascade.move(-85);
+		} else {
+			cascade.move(0);
 		}
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
 			claw_spin_in = !claw_spin_in;

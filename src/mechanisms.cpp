@@ -1,9 +1,10 @@
 #include "mechanisms.h"
+#include "estop.h"
 #include <cmath>
 
 void mech_init() {
 	cascade.tare_position();
-	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);   // stays up on its own, no active hold
 	claw_turn.tare_position();
 	claw_turn.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 	claw_turn_horizontal = false;
@@ -25,7 +26,7 @@ void lift_to(double deg, int velocity) {
 bool lift_wait(double deg, int timeout_ms, double tol_deg) {
 	uint32_t start = pros::millis();
 	while (std::fabs(cascade.get_position() - deg) > tol_deg) {
-		if (pros::millis() - start > (uint32_t)timeout_ms) return false;
+		if (pros::millis() - start > (uint32_t)timeout_ms || estop_triggered()) return false;
 		pros::delay(10);
 	}
 	return true;
@@ -45,7 +46,7 @@ bool claw_flip_wait(int timeout_ms, double tol_deg) {
 	double target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
 	uint32_t start = pros::millis();
 	while (std::fabs(claw_turn.get_position() - target) > tol_deg) {
-		if (pros::millis() - start > (uint32_t)timeout_ms) return false;
+		if (pros::millis() - start > (uint32_t)timeout_ms || estop_triggered()) return false;
 		pros::delay(10);
 	}
 	return true;
@@ -72,19 +73,24 @@ void grab_pin_finish() {
 }
 
 void score_pin(double lift_deg) {
+	// Each step bails out on E-STOP (L1 + R1) without moving anything else.
 	lift_to(lift_deg);
 	lift_wait(lift_deg, 1500);
+	if (estop_triggered()) return;
 
 	claw_flip(true);
 	claw_flip_wait(1200);
+	if (estop_triggered()) return;
 
 	claw_set_open(true);
 	pros::delay(PIN_DROP_SETTLE_MS);
+	if (estop_triggered()) return;
 
 	// Flip back before lowering so the claw doesn't come down onto the goal.
 	// ~940 deg at CLAW_TURN_DOWN_VELOCITY (100 rpm) takes ~1.6 s.
 	claw_flip(false);
 	claw_flip_wait(2000);
+	if (estop_triggered()) return;
 	claw_set_open(false);
 
 	lift_to(LIFT_DOWN_DEG);

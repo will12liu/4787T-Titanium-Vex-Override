@@ -3,6 +3,8 @@
 #include "mechanisms.h"
 #include "auton_selector.h"
 #include "auton.h"
+#include "tuning.h"
+#include "estop.h"
 #include <cstdlib>
 
 namespace {
@@ -46,6 +48,10 @@ void initialize() {
 		master.set_text(0, 0, "init ran");
 		pros::screen::set_pen(pros::Color::white);
 		while (true) {
+			if (tuning_active()) {   // tuning screen owns the display
+				pros::delay(200);
+				continue;
+			}
 			char seen[NUM_PORTS + 1];
 			for (int i = 0; i < NUM_PORTS; i++) {
 				switch (pros::Device::get_plugged_type(i + 1)) {
@@ -68,6 +74,8 @@ void initialize() {
 	mech_init();             // tare lift + claw flip, set brake modes. Lift must be fully down.
 	auton_selector_start();  // LEFT / RIGHT buttons on the Brain + controller D-pad
 	auton_init();            // find IMU, calibrate LemLib chassis (blocks ~2-3 s)
+	tuning_start();          // TUNE button on the Brain: PID + sensor tuning
+	estop_start();           // L1 + R1 stops auton test runs
 }
 
 /**

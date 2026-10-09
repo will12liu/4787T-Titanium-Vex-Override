@@ -2,6 +2,8 @@
 
 // Call once from initialize(), after mech_init(). Checks the IMU is present
 // and calibrates the LemLib chassis. Blocks for ~2-3 s while the IMU calibrates.
+// Safe to call again later (e.g. after plugging the IMU back in); does nothing
+// once odom is ready.
 void auton_init();
 
 // True if LemLib odom is compiled in, the IMU was found, and calibration ran.

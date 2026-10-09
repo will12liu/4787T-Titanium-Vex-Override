@@ -22,7 +22,7 @@ pros::Motor claw_spin(8, pros::MotorGears::green);
 #if USE_CLAW_PISTON
 pros::adi::Pneumatics claw_piston('A', false);
 #endif
-pros::Imu imu (11);
+pros::Imu imu (5);
 pros::Motor intake_motor(18, pros::MotorGears::green);
 
 
@@ -67,7 +67,7 @@ lemlib::ControllerSettings angular_controller(
 
 #if USE_TRACKING_WHEELS
 // PLACEHOLDER PORTS — update once build team confirms wiring.
-// Chosen to avoid the IMU (11) and claw_turn (13).
+// Chosen to avoid the IMU (5) and claw_turn (13).
 pros::Distance distance_sensor(15);
 pros::Rotation vertical_rotation(12);
 pros::Rotation horizontal_rotation(14);

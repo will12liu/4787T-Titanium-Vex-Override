@@ -3,6 +3,7 @@
 #include "mechanisms.h"
 #include "auton_selector.h"
 #include "auton.h"
+#include "estop.h"
 #include <cmath>
 
 // =============================================================================
@@ -70,12 +71,18 @@ constexpr bool TOGGLE_PUSH_WITH_FRONT = true;
 // Each push rolls the Toggle one face: yellow -> red -> blue.
 constexpr int TOGGLE_PUSHES_RED = 1;
 constexpr int TOGGLE_PUSHES_BLUE = 2;
-// PLACEHOLDER — tune so each push fully rolls the Toggle over and it seats flat.
-constexpr int TOGGLE_PUSH_VOLTAGE = 80;
-constexpr int TOGGLE_PUSH_MS = 500;
-constexpr int TOGGLE_BACKOFF_VOLTAGE = 60;
-constexpr int TOGGLE_BACKOFF_MS = 350;      // far enough for the Toggle to roll freely
-constexpr int TOGGLE_SETTLE_MS = 250;       // let it come to rest before the next push
+// Each push: back away for a run-up, then charge at the wall, speeding up the
+// closer it gets, and finish at full power so it hits hard enough to roll it.
+// Distances come from the drive motor encoders, so no IMU is needed.
+// PLACEHOLDER — tune so each hit fully rolls the Toggle over and it seats flat.
+constexpr float TOGGLE_RUNUP_IN = 16.0f;         // how far to back up before each charge (more = faster at impact)
+constexpr int TOGGLE_RUNUP_VOLTAGE = 70;         // speed backing up
+constexpr int TOGGLE_CHARGE_START_VOLTAGE = 127; // speed at the start of the charge... (127 = full power the whole way)
+constexpr int TOGGLE_HIT_VOLTAGE = 127;          // ...ramping up to this at the wall
+constexpr int TOGGLE_HIT_MS = 500;               // keep full power this long after reaching the wall
+constexpr int TOGGLE_CHARGE_TIMEOUT_MS = 1200;   // give up on a charge after this
+constexpr float TOGGLE_BACKOFF_IN = 6.0f;        // back off after the last hit so the Toggle can settle
+constexpr int TOGGLE_SETTLE_MS = 250;            // let it come to rest before the next charge
 
 constexpr int TOWARD_WALL = TOGGLE_PUSH_WITH_FRONT ? 1 : -1;   // drive sign that moves toward the wall
 constexpr float START_HEADING = TOGGLE_PUSH_WITH_FRONT ? 180.0f : 0.0f;
@@ -94,33 +101,83 @@ void stop_drive() {
 	right_motors.move(0);
 }
 
-// Time-based drive, no odom. voltage in [-127, 127].
+// Time-based drive, no odom. voltage in [-127, 127]. Stops early on E-STOP.
 void drive_for(int voltage, int duration_ms) {
 	left_motors.move(voltage);
 	right_motors.move(voltage);
-	pros::delay(duration_ms);
+	uint32_t end = pros::millis() + duration_ms;
+	while (pros::millis() < end && !estop_triggered()) pros::delay(10);
 	stop_drive();
 }
 
-// 1. Push the Toggle once (red) or twice (blue), backing off after each push so
-//    it can roll and seat. Time-based so the fallback auton can use it too.
-//    Ends backed off, not touching the Toggle.
+// Distance driven, in inches, from the drive motor encoders (average of both
+// sides, + = forward). Works without the IMU or tracking wheels.
+double drive_pos_in() {
+	double deg = (left_motors.get_position() + right_motors.get_position()) / 2.0;
+#if USE_LEMLIB_ODOM
+	return deg / 360.0 * M_PI * drivetrain.wheelDiameter * (drivetrain.rpm / 600.0);
+#else
+	return deg / 360.0 * M_PI * 3.25;   // 3.25" wheels, direct drive
+#endif
+}
+
+// Drive straight at a fixed voltage until `inches` are covered (or timeout).
+// voltage sign sets the direction.
+void drive_dist(int voltage, float inches, int timeout_ms) {
+	double p0 = drive_pos_in();
+	uint32_t t0 = pros::millis();
+	left_motors.move(voltage);
+	right_motors.move(voltage);
+	while (std::fabs(drive_pos_in() - p0) < inches && pros::millis() - t0 < (uint32_t)timeout_ms &&
+	       !estop_triggered()) {
+		pros::delay(10);
+	}
+	stop_drive();
+}
+
+// Charge the Toggle from TOGGLE_RUNUP_IN away: speed ramps up with distance
+// covered, so it is fastest at the moment of impact. Ends at the wall when the
+// run-up distance is used up, the robot stalls against the Toggle, or timeout,
+// then holds full power for TOGGLE_HIT_MS to push the roll through.
+void charge_toggle() {
+	double p0 = drive_pos_in();
+	uint32_t t0 = pros::millis();
+	while (!estop_triggered() && pros::millis() - t0 < (uint32_t)TOGGLE_CHARGE_TIMEOUT_MS) {
+		double covered = std::fabs(drive_pos_in() - p0);
+		if (covered >= TOGGLE_RUNUP_IN) break;
+		// Stalled against the Toggle/wall early: stop ramping and go to the hit.
+		double rpm = (std::fabs(left_motors.get_actual_velocity()) + std::fabs(right_motors.get_actual_velocity())) / 2.0;
+		if (pros::millis() - t0 > 200 && covered > 1.0 && rpm < 20) break;
+		double frac = covered / TOGGLE_RUNUP_IN;
+		int v = TOGGLE_CHARGE_START_VOLTAGE + (int)((TOGGLE_HIT_VOLTAGE - TOGGLE_CHARGE_START_VOLTAGE) * frac);
+		left_motors.move(TOWARD_WALL * v);
+		right_motors.move(TOWARD_WALL * v);
+		pros::delay(10);
+	}
+	drive_for(TOWARD_WALL * TOGGLE_HIT_VOLTAGE, TOGGLE_HIT_MS);
+}
+
+// 1. Hit the Toggle once (red) or twice (blue). Each hit backs up for a run-up
+//    first, then charges. Encoder/time based so the fallback auton (no IMU) can
+//    use it too. Ends backed off, not touching the Toggle.
 void push_toggle() {
 	status("toggle");
 	int pushes = color == AutonColor::RED ? TOGGLE_PUSHES_RED : TOGGLE_PUSHES_BLUE;
-	for (int i = 0; i < pushes; i++) {
-		drive_for(TOWARD_WALL * TOGGLE_PUSH_VOLTAGE, TOGGLE_PUSH_MS);
+	for (int i = 0; i < pushes && !estop_triggered(); i++) {
+		drive_dist(-TOWARD_WALL * TOGGLE_RUNUP_VOLTAGE, TOGGLE_RUNUP_IN, 1000);   // run-up
+		pros::delay(TOGGLE_SETTLE_MS);
+		charge_toggle();
 #if USE_LEMLIB_ODOM
-		// Against the wall now, so y is known exactly. Re-zero it: pushing makes
+		// Against the wall now, so y is known exactly. Re-zero it: hitting makes
 		// the wheels slip and the drive encoders over-count.
 		if (odom_ready) {
 			lemlib::Pose p = chassis.getPose();
 			chassis.setPose(p.x, 0, p.theta);
 		}
 #endif
-		drive_for(-TOWARD_WALL * TOGGLE_BACKOFF_VOLTAGE, TOGGLE_BACKOFF_MS);
-		pros::delay(TOGGLE_SETTLE_MS);
 	}
+	if (!estop_triggered()) drive_dist(-TOWARD_WALL * TOGGLE_RUNUP_VOLTAGE, TOGGLE_BACKOFF_IN, 800);
+	pros::delay(TOGGLE_SETTLE_MS);
 }
 
 #if USE_LEMLIB_ODOM
@@ -151,8 +208,11 @@ void score_preload() {
 	status("to goal");
 	if (!drive_only) lift_to(LIFT_ALLIANCE_GOAL_DEG);
 	drive_to(LEAVE_WALL, 1000, {.forwards = !TOGGLE_PUSH_WITH_FRONT});
+	if (estop_triggered()) return;
 	face(ALLIANCE_GOAL, 1000);
+	if (estop_triggered()) return;
 	drive_to_reach(ALLIANCE_GOAL, CLAW_REACH, 1500);
+	if (estop_triggered()) return;
 	status("score");
 	if (drive_only) {
 		pros::delay(1000);   // stand-in for score_pin() so you can see where it stopped
@@ -166,11 +226,11 @@ void run_odom_auton() {
 	chassis.setBrakeMode(pros::E_MOTOR_BRAKE_BRAKE);
 
 	push_toggle();                                     // ~1.1 s red, ~2.2 s blue
-	if (time_left_ms() > SCORE_MIN_MS) score_preload(); // ~6 s
+	if (!estop_triggered() && time_left_ms() > SCORE_MIN_MS) score_preload(); // ~6 s
 
 	// 3. End clear of the wall, Toggle and goals, with nothing moving.
 	status("done");
-	if (time_left_ms() > 1000) back_to(END_POINT, 1200);
+	if (!estop_triggered() && time_left_ms() > 1000) back_to(END_POINT, 1200);
 	chassis.cancelAllMotions();
 	stop_drive();
 }
@@ -181,14 +241,20 @@ void run_odom_auton() {
 // not touching the perimeter. Keeps the preload in the claw.
 void run_fallback_auton() {
 	status("FALLBACK");
+	// BRAKE so each run-up stops where it should instead of coasting further back.
+	left_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+	right_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	push_toggle();
-	drive_for(-TOWARD_WALL * 70, 600);
+	if (!estop_triggered()) drive_for(-TOWARD_WALL * 70, 600);
+	left_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);   // driver control default
+	right_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_COAST);
 }
 
 } // namespace
 
 void auton_init() {
 #if USE_LEMLIB_ODOM
+	if (odom_ready) return;
 	// The IMU can take a moment to enumerate after power-on.
 	bool imu_present = false;
 	for (int i = 0; i < 20 && !imu_present; i++) {
@@ -216,6 +282,7 @@ void autonomous() {
 	side = auton_selector_get();
 	color = auton_color_get();
 	status("start");
+	estop_arm();   // L1 + R1 stops the run (test runs only, never in a match)
 
 #if USE_LEMLIB_ODOM
 	if (odom_ready) {
@@ -227,8 +294,9 @@ void autonomous() {
 	run_fallback_auton();
 #endif
 
+	estop_disarm();
 	mech_stop_all();
-	status("end");
+	status(estop_triggered() ? "E-STOPPED" : "end");
 }
 
 void auton_drive_test() {

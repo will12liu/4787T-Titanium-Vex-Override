@@ -1,5 +1,6 @@
 #include "auton_selector.h"
 #include "main.h"
+#include "tuning.h"
 
 namespace {
 
@@ -49,6 +50,13 @@ void selector_task_fn() {
 	bool first = true;
 
 	while (true) {
+		// Tuning screen owns the display and touch; redraw when it closes.
+		if (tuning_active()) {
+			first = true;
+			pros::delay(50);
+			continue;
+		}
+
 		// Touch: only act on a fresh press so a held finger doesn't flicker.
 		pros::screen_touch_status_s_t t = pros::screen::touch_status();
 		if (t.touch_status == pros::E_TOUCH_PRESSED && t.y >= BTN_Y0 && t.y <= BTN_Y1) {
