@@ -31,7 +31,7 @@ void opcontrol() {
 	// shift the flip targets after autonomous.
 	// Cascade stays up on its own now, so no active hold: BRAKE just shorts the
 	// motor when stopped (no power), instead of HOLD fighting gravity.
-	cascade.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+	cascade.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	// Claw turn states: 0 = down/vertical, 1 = horizontal, 2 = lifted off the cone
 	int claw_turn_state = 0;
 	// Lift is a fraction of the vertical-to-horizontal travel past horizontal.
