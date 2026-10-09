@@ -22,6 +22,10 @@ constexpr double CLAW_HEIGHT_DOWN_IN = 0.0;   // PLACEHOLDER: same point, lift f
 constexpr double LIFT_MAX_DEG = 0.0;          // PLACEHOLDER: lift degrees when fully up (0 = not measured yet)
 constexpr double LIFT_CLEARANCE_IN = 1.0;     // how far above the goal top to hold the pin
 
+// Cascade brake mode when no input, applied to BOTH motors. COAST = rolls to a
+// stop slowly, BRAKE = stops almost instantly, HOLD = actively holds.
+constexpr pros::motor_brake_mode_e_t CASCADE_BRAKE_MODE = pros::E_MOTOR_BRAKE_BRAKE;
+
 // Goal heights from the manual: alliance 3.25", neutral short 5.77", centre 8.77".
 constexpr double lift_deg_for_height(double height_in, double fallback_deg) {
 	return LIFT_MAX_DEG <= 0.0 ? fallback_deg

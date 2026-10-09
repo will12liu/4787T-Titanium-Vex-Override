@@ -29,15 +29,14 @@ void opcontrol() {
 	bool aux_open = false;
 	// claw_turn is tared once at boot in mech_init(); re-taring here would
 	// shift the flip targets after autonomous.
-	// Cascade stays up on its own now, so no active hold: BRAKE just shorts the
-	// motor when stopped (no power), instead of HOLD fighting gravity.
-	cascade.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+	// Cascade brake mode is CASCADE_BRAKE_MODE in mechanisms.h (no active hold).
+	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // set in mechanisms.h
 	// Claw turn states: 0 = down/vertical, 1 = horizontal, 2 = lifted off the cone
 	int claw_turn_state = 0;
 	// Lift is a fraction of the vertical-to-horizontal travel past horizontal.
-	// 0.5 = about 45 degrees if horizontal is 90 degrees from vertical. Use 0.33 to 0.67 for 30 to 60.
+	// Travel is 940 motor degrees, so 0.25 = 235 degrees past horizontal (0.5 was 470).
 	// The sign follows the vertical-to-horizontal direction. If it lifts the wrong way, use -0.5.
-	const double CLAW_LIFT_FRACTION = 0.5;
+	const double CLAW_LIFT_FRACTION = 0.25;   // was 0.5, lifted too high. Lower = less lift
 	const double claw_turn_lift_deg = CLAW_TURN_HORIZONTAL_DEG +
 		(CLAW_TURN_HORIZONTAL_DEG - CLAW_TURN_VERTICAL_DEG) * CLAW_LIFT_FRACTION;
 	double claw_turn_target = CLAW_TURN_VERTICAL_DEG;

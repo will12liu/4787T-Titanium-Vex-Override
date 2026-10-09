@@ -4,7 +4,7 @@
 
 void mech_init() {
 	cascade.tare_position_all();   // _all: plain tare_position() only zeroes the first motor
-	cascade.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);   // _all, or only the first motor brakes. Stays up on its own, no active hold
+	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // _all, or only the first motor gets it
 	claw_turn.tare_position();
 	claw_turn.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 	claw_turn_horizontal = false;
