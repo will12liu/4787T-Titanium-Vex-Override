@@ -34,6 +34,7 @@ extern pros::Motor claw_turn;
 extern pros::Motor claw_spin;
 extern pros::adi::Pneumatics aux_piston_a;
 extern pros::adi::Pneumatics aux_piston_b;
+extern pros::Rotation horiz_odom;
 
 // PLACEHOLDER PORT — update once build team confirms IMU mounting/wiring
 extern pros::Imu imu;

@@ -10,12 +10,13 @@
 
 
 // PLACEHOLDER PORTS — update once build team finalizes wiring
-pros::MotorGroup left_motors({1,2}, pros::MotorGears::blue);
-pros::MotorGroup right_motors({-3,-4}, pros::MotorGears::blue);
+pros::MotorGroup left_motors({1,4}, pros::MotorGears::blue);
+pros::MotorGroup right_motors({-2,-3}, pros::MotorGears::blue);
 pros::MotorGroup cascade ({-20,19}, pros::MotorGears::green);
 
-pros::Motor claw_turn(-13, pros::MotorGears::green);
-pros::Motor claw_spin(8, pros::MotorGears::green);
+pros::Motor claw_turn(-17, pros::MotorGears::green);
+pros::Motor claw_spin(16, pros::MotorGears::green);
+pros::Rotation horiz_odom(6);
 
 
 // PLACEHOLDER PORT — update once build team confirms ADI wiring

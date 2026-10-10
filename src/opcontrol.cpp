@@ -114,7 +114,7 @@ void opcontrol() {
 		if (claw_spin_in) {
 			claw_spin.move(127);
 		} else if (claw_spin_out) {
-			claw_spin.move(-60);
+			claw_spin.move(-127);
 		} else {
 			claw_spin.move(0);
 		}
