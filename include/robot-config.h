@@ -18,7 +18,7 @@ extern pros::MotorGroup cascade;
 // Off until they are physically mounted and ports/offsets are confirmed.
 // Turn this on once the horizontal pod is mounted and plugged in; with it on and
 // no pod, odom reads garbage.
-#define USE_TRACKING_WHEELS 0
+#define USE_TRACKING_WHEELS 1
 
 // Which pods exist (only matter when USE_TRACKING_WHEELS is 1). Forward/back
 // distance comes from the drive motor encoders unless the vertical pod is on.
@@ -53,10 +53,6 @@ extern pros::Distance distance_sensor;
 #if USE_VERTICAL_POD
 extern pros::Rotation vertical_rotation;
 #endif
-#if USE_HORIZONTAL_POD
-extern pros::Rotation horizontal_rotation;
-#endif
-extern pros::Rotation claw_rotation;
 #if USE_VERTICAL_POD
 extern lemlib::TrackingWheel vertical_tracking_wheel;
 #endif

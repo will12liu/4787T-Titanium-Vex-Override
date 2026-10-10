@@ -16,7 +16,7 @@ pros::MotorGroup cascade ({-20,19}, pros::MotorGears::green);
 
 pros::Motor claw_turn(-17, pros::MotorGears::green);
 pros::Motor claw_spin(16, pros::MotorGears::green);
-pros::Rotation horiz_odom(6);
+pros::Rotation horiz_odom(-6);   // horizontal odom pod: port 6 (Brain port check), reversed (x went down sliding right). Offset not verified yet
 
 
 // PLACEHOLDER PORT — update once build team confirms ADI wiring
@@ -68,15 +68,11 @@ lemlib::ControllerSettings angular_controller(
 
 #if USE_TRACKING_WHEELS
 // PLACEHOLDER PORTS — update once build team confirms wiring.
-// Chosen to avoid the IMU (5) and claw_turn (13).
+// Chosen to avoid the IMU (5), claw_turn (17) and claw_spin (16).
 pros::Distance distance_sensor(15);
 #if USE_VERTICAL_POD
 pros::Rotation vertical_rotation(12);
 #endif
-#if USE_HORIZONTAL_POD
-pros::Rotation horizontal_rotation(14);
-#endif
-pros::Rotation claw_rotation(16);
 
 // PLACEHOLDER OFFSETS — update once tracking wheel mounting is finalized (offset is distance from tracking center, in inches)
 // Vertical pod (optional, USE_VERTICAL_POD): offset is how far it sits left (-) or right (+)
@@ -89,7 +85,7 @@ lemlib::TrackingWheel vertical_tracking_wheel(&vertical_rotation, lemlib::Omniwh
 // center. It MUST be measured; a wrong offset adds fake sideways movement whenever the
 // robot turns. If pose x goes DOWN when you slide the robot to the right, reverse the port.
 #if USE_HORIZONTAL_POD
-lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_rotation, lemlib::Omniwheel::NEW_2, -1);
+lemlib::TrackingWheel horizontal_tracking_wheel(&horiz_odom, lemlib::Omniwheel::NEW_2, -1);
 #endif
 
 // Odometry: forward/back distance from the vertical pod if there is one, otherwise from
