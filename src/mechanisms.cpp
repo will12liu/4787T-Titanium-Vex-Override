@@ -5,8 +5,9 @@
 void mech_init() {
 	cascade.tare_position_all();   // _all: plain tare_position() only zeroes the first motor
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // _all, or only the first motor gets it
+	// Boot position = 0 = vertical. CLAW_TURN_VERTICAL_DEG is 0 to match, so nothing
+	// moves when driver control starts.
 	claw_turn.tare_position();
-	claw_turn.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 	claw_turn_horizontal = false;
 	intake_motor.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
 	claw_spin.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
@@ -72,28 +73,36 @@ void grab_pin_finish() {
 	intake_set(0);
 }
 
+bool claw_lift_off(int timeout_ms, double tol_deg) {
+	claw_turn_horizontal = true;
+	claw_turn.move_absolute(CLAW_TURN_LIFT_DEG, CLAW_TURN_VELOCITY);
+	uint32_t start = pros::millis();
+	while (std::fabs(claw_turn.get_position() - CLAW_TURN_LIFT_DEG) > tol_deg) {
+		if (pros::millis() - start > (uint32_t)timeout_ms || estop_triggered()) return false;
+		pros::delay(10);
+	}
+	return true;
+}
+
 void score_pin(double lift_deg) {
 	// Each step bails out on E-STOP (L1 + R1) without moving anything else.
 	lift_to(lift_deg);
 	lift_wait(lift_deg, 1500);
 	if (estop_triggered()) return;
 
+	// 1. Vertical -> horizontal.
 	claw_flip(true);
 	claw_flip_wait(1200);
 	if (estop_triggered()) return;
 
-	claw_set_open(true);
-	pros::delay(PIN_DROP_SETTLE_MS);
+	// 2. Claw spin (the A button) to drop the pin.
+	claw_spin.move(CLAW_DROP_SPEED);
+	pros::delay(CLAW_DROP_MS);
+	claw_spin.move(0);
 	if (estop_triggered()) return;
 
-	// Flip back before lowering so the claw doesn't come down onto the goal.
-	// ~940 deg at CLAW_TURN_DOWN_VELOCITY (100 rpm) takes ~1.6 s.
-	claw_flip(false);
-	claw_flip_wait(2000);
-	if (estop_triggered()) return;
-	claw_set_open(false);
-
-	lift_to(LIFT_DOWN_DEG);
+	// 3. B button's 2nd press: slightly up.
+	claw_lift_off();
 }
 
 void mech_stop_all() {

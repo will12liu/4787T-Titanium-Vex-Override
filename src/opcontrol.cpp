@@ -31,14 +31,11 @@ void opcontrol() {
 	// shift the flip targets after autonomous.
 	// Cascade brake mode is CASCADE_BRAKE_MODE in mechanisms.h (no active hold).
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // set in mechanisms.h
+	claw_turn.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);   // set here, not at boot: it made the claw twitch
 	// Claw turn states: 0 = down/vertical, 1 = horizontal, 2 = lifted off the cone
 	int claw_turn_state = 0;
-	// Lift is a fraction of the vertical-to-horizontal travel past horizontal.
-	// Travel is 940 motor degrees, so 0.25 = 235 degrees past horizontal (0.5 was 470).
-	// The sign follows the vertical-to-horizontal direction. If it lifts the wrong way, use -0.5.
-	const double CLAW_LIFT_FRACTION = 0.25;   // was 0.5, lifted too high. Lower = less lift
-	const double claw_turn_lift_deg = CLAW_TURN_HORIZONTAL_DEG +
-		(CLAW_TURN_HORIZONTAL_DEG - CLAW_TURN_VERTICAL_DEG) * CLAW_LIFT_FRACTION;
+	// The 'slightly up' position (2nd B press) is CLAW_TURN_LIFT_DEG in mechanisms.h.
+	const double claw_turn_lift_deg = CLAW_TURN_LIFT_DEG;
 	double claw_turn_target = CLAW_TURN_VERTICAL_DEG;
 
 	while (true) {
@@ -60,12 +57,6 @@ void opcontrol() {
 			aux_piston_a.set_value(aux_open);
 			aux_piston_b.set_value(aux_open);
 		}
-		// Drive-only test: R2 runs the selected auton's driving with no lift or claw.
-		if (!pros::competition::is_connected() && !tuning_active() &&
-		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) {
-			auton_drive_test();
-		}
-
 		// 1. Drivetrain
 		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
@@ -87,9 +78,11 @@ void opcontrol() {
 		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) &&
 		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-		// Intake: R1 toggles
+		// Intake: R1 toggles the intake and the claw spin (A's function) together
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
 			intake_running = !intake_running;
+			claw_spin_out = intake_running;
+			claw_spin_in = false;
 		}
 		intake_motor.move(intake_running ? 127 : 0);
 
@@ -102,17 +95,15 @@ void opcontrol() {
 			cascade.move(0);
 		}
 
-		// Claw spin: Y in, A out (toggles)
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
+		// Claw spin: press A or Y once to spin IN, press again to stop.
+		// (R1 above also starts claw spin out together with the intake.)
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A) ||
+		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
 			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
 		}
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
-			claw_spin_out = !claw_spin_out;
-			claw_spin_in = false;
-		}
 		if (claw_spin_in) {
-			claw_spin.move(127);
+			claw_spin.move(45);
 		} else if (claw_spin_out) {
 			claw_spin.move(-127);
 		} else {

@@ -15,7 +15,7 @@ pros::MotorGroup right_motors({-2,-3}, pros::MotorGears::blue);
 pros::MotorGroup cascade ({-20,19}, pros::MotorGears::green);
 
 pros::Motor claw_turn(-17, pros::MotorGears::green);
-pros::Motor claw_spin(16, pros::MotorGears::green);
+pros::Motor claw_spin(15, pros::MotorGears::green);
 pros::Rotation horiz_odom(6);
 
 
@@ -23,7 +23,7 @@ pros::Rotation horiz_odom(6);
 // PLACEHOLDER PORTS, update once wiring is confirmed
 pros::adi::Pneumatics aux_piston_a('A', false);
 pros::adi::Pneumatics aux_piston_b('B', false);
-pros::Imu imu (5);
+pros::Imu imu (8);
 pros::Motor intake_motor(18, pros::MotorGears::green);
 
 
@@ -41,7 +41,7 @@ lemlib::Drivetrain drivetrain(
 // PLACEHOLDER PID GAINS — untuned. Requires empirical tuning on real
 // hardware once chassis is finalized. Do not trust these values as-is.
 lemlib::ControllerSettings lateral_controller(
-    10,   // kP
+    28,   // kP (was 10; higher = faster, more power, can overshoot)
     0,    // kI
     3,    // kD
     3,    // anti-windup range

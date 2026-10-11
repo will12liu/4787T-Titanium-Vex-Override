@@ -7,8 +7,21 @@
 // (e.g. the upcoming pneumatic claw flip) only changes this file.
 
 // ---- Claw flip (motor-driven today) ------------------------------------------
-constexpr double CLAW_TURN_VERTICAL_DEG = 60.0;
-constexpr double CLAW_TURN_HORIZONTAL_DEG = 1000.0;
+// Vertical = where the claw sits at boot (position tared to 0). Horizontal is 940
+// degrees of travel from there (it was 60 -> 1000, same travel, but the 60 made the
+// claw drive up the moment driver control started).
+constexpr double CLAW_TURN_VERTICAL_DEG = 0.0;
+constexpr double CLAW_TURN_HORIZONTAL_DEG = 880.0;
+// B button's 2nd press: the claw lifts a bit past horizontal (off the cone / goal).
+// It is a fraction of the vertical-to-horizontal travel past horizontal: 0.25 = 235 deg
+// past horizontal. Lower = less lift. If it lifts the wrong way, use a negative number.
+constexpr double CLAW_LIFT_FRACTION = 0.25;
+constexpr double CLAW_TURN_LIFT_DEG = CLAW_TURN_HORIZONTAL_DEG +
+	(CLAW_TURN_HORIZONTAL_DEG - CLAW_TURN_VERTICAL_DEG) * CLAW_LIFT_FRACTION;
+// Dropping the pin = the A button's claw spin. Speed 127 = A's spin, if it spins the
+// wrong way for dropping use -127. Time is how long it spins.
+constexpr int CLAW_DROP_SPEED = 127;
+constexpr int CLAW_DROP_MS = 700;
 constexpr int CLAW_TURN_VELOCITY = 200;
 constexpr int CLAW_TURN_DOWN_VELOCITY = 100;
 
@@ -57,6 +70,8 @@ bool lift_wait(double deg, int timeout_ms, double tol_deg = 20.0);
 // Keeps the shared claw_turn_horizontal flag in sync so opcontrol agrees with auton.
 void claw_flip(bool horizontal);
 bool claw_flip_wait(int timeout_ms, double tol_deg = 30.0);
+// Move the claw to the 'slightly up' position (B's 2nd press) and wait for it.
+bool claw_lift_off(int timeout_ms = 1500, double tol_deg = 30.0);
 
 // Pneumatic claw jaw. No-op when USE_CLAW_PISTON is 0.
 void claw_set_open(bool open);
@@ -67,8 +82,9 @@ void grab_pin_start();
 // Finish taking a pin: let the intake settle, close the claw, stop the intake.
 void grab_pin_finish();
 // Blocking. Assumes a pin is held and the robot is positioned at the goal:
-// lift to lift_deg, flip the claw out over the goal, release, flip back, close,
-// then start lowering the lift (does not wait for it to come down).
+// lift to lift_deg, flip the claw to horizontal, spin the claw (A button) to drop the
+// pin, then move the claw to the slightly-up position (B's 2nd press). Leaves the
+// lift up.
 void score_pin(double lift_deg);
 // Stop every non-drive motor.
 void mech_stop_all();
