@@ -33,9 +33,8 @@ void build_expected(char* expected) {
 	mark(vertical_rotation.get_port(), 'R');
 #endif
 #if USE_HORIZONTAL_POD
-	mark(horizontal_rotation.get_port(), 'R');
+	mark(horiz_odom.get_port(), 'R');
 #endif
-	mark(claw_rotation.get_port(), 'R');
 #endif
 }
 
