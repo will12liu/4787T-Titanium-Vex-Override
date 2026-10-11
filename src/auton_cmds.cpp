@@ -210,7 +210,7 @@ void lift_wait(int timeout_ms) { auton_status("lift_wait"); if (!stopped()) ::li
 
 // ================================== claw ==========================================
 void claw_in() { auton_status("claw_in"); claw_flip(false); claw_flip_wait(2000); }
-void claw_out() { auton_status("claw_out"); claw_flip(true); claw_flip_wait(1200); }
+void claw_out() { auton_status("claw_out"); claw_flip(true); claw_flip_wait(1000); }
 void claw_up() { auton_status("claw_up"); if (!stopped()) claw_lift_off(); }
 void claw_drop(int speed, int ms) {
 	auton_status("claw_drop");

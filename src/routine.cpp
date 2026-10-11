@@ -33,17 +33,17 @@
 
 void run_routine() {
 	// ---- 1. Hit the Toggle twice -------------------------------------------
-	drive_time(-50,400);
+	drive_time(-50,500);
 	drive_time(127, 900);
-	wait(100);        // hit 1: drive in
-	drive_time(-50, 400);        // back up
-	wait(100);                   // let the Toggle stop moving
-	drive_time(127, 900);        // hit 2: drive in
+	wait(150);        // hit 1: drive in
+	drive_time(-50, 600);        // back up
+	wait(150);                   // let the Toggle stop moving
+	drive_time(127, 950);        // hit 2: drive in
 	drive_time(-95, 350);        // back off the Toggle a little
 
 	// ---- 2. Go to our goal and score ---------------------------------------                // lift starts rising while we drive
 	turn(mirror(-85), 100);      // turn so the BACK (claw side) faces our goal
-	move(-127, 500);              // reverse toward the goal
+	move(-45, 50);              // reverse toward the goal
 
 	// ---- 3. Score: each step on its own, so you can reorder / retime them --
                 // start the lift rising
