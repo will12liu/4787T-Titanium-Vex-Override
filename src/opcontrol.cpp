@@ -95,12 +95,13 @@ void opcontrol() {
 			cascade.move(0);
 		}
 
-		// Claw spin: press A or Y once to spin IN, press again to stop.
-		// (R1 above also starts claw spin out together with the intake.)
+		// Claw spin: press A once to spin IN, press again to stop.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
 			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
 		}
+		// Claw spin: press Y once to spin OUT, press again to stop.
+		// (R1 above also starts claw spin out together with the intake.)
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
 			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
