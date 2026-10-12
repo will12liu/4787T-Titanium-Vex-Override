@@ -27,6 +27,7 @@ void opcontrol() {
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;
 	bool aux_open = false;
+	int r1_state = 0;
 	// claw_turn is tared once at boot in mech_init(); re-taring here would
 	// shift the flip targets after autonomous.
 	// Cascade brake mode is CASCADE_BRAKE_MODE in mechanisms.h (no active hold).
@@ -80,8 +81,9 @@ void opcontrol() {
 
 		// Intake: R1 toggles the intake and the claw spin (A's function) together
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
-			intake_running = !intake_running;
-			claw_spin_out = intake_running;
+			r1_state = (r1_state + 1) % 3;
+			intake_running = (r1_state == 1);
+			claw_spin_out = (r1_state != 0);
 			claw_spin_in = false;
 		}
 		intake_motor.move(intake_running ? 127 : 0);
