@@ -23,6 +23,7 @@
 void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
+	int inverse = 1;
 	bool intake_running = false;
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;
@@ -59,11 +60,16 @@ void opcontrol() {
 			aux_piston_b.set_value(aux_open);
 		}
 		// 1. Drivetrain
+		// R2 toggles forward/reverse driving; steering keeps its usual direction.
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) {
+			inverse = -inverse;
+		}
 		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
 		if (std::abs(dir) < 10) dir = 0;
 		if (std::abs(turn) < 10) turn = 0;
+		dir *= inverse;
 
 		int left = std::clamp(dir + turn, -127, 127);
 		int right = std::clamp(dir - turn, -127, 127);
