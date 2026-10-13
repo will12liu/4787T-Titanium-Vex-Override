@@ -58,7 +58,8 @@ void opcontrol() {
 			aux_piston_b.set_value(aux_open);
 		}
 		// 1. Drivetrain
-		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+		// Negated: stick down drives forward, stick up drives backward.
+		int dir = -master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
 		if (std::abs(dir) < 10) dir = 0;

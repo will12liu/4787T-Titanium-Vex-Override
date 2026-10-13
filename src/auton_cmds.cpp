@@ -29,7 +29,7 @@ constexpr int   TURN_MIN_SPEED = 18;
 constexpr float MOVE_TOLERANCE_IN = 0.5f;    // "arrived" when within this many inches
 constexpr float TURN_TOLERANCE_DEG = 1.5f;   // "arrived" when within this many degrees
 
-// Starting PID. The routine can change these with move_pid() / turn_pid().
+
 constexpr float START_MOVE_KP = 8.0f;
 constexpr float START_MOVE_KD = 0.4f;
 constexpr float START_TURN_KP = 1.6f;
@@ -84,6 +84,9 @@ void auton_cmds_reset() {
 	goal_heading = start_heading;
 	left_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	right_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
+#if USE_LEMLIB_ODOM
+	if (auton_odom_ready()) chassis.setPose(0, 0, 0);   // the start spot is (0, 0), facing 0
+#endif
 }
 
 void auton_status(const char* msg) {
@@ -201,6 +204,64 @@ void turn_to(float degrees_from_start, int speed, float kP, float kD, int timeou
 	auton_status("turn_to");
 	turn_to_heading(start_heading + degrees_from_start, speed, kP, kD, timeout_ms);
 }
+
+// ============================= LemLib (odometry) ==================================
+// Each one blocks (async = false) so the routine still reads top to bottom.
+// E-STOP cancels the motion, which makes the call return.
+namespace {
+bool odom_ok(const char* name) {
+	auton_status(name);
+#if USE_LEMLIB_ODOM
+	if (auton_odom_ready()) return !stopped();
+#endif
+	auton_status("NO ODOM: skipped");
+	return false;
+}
+} // namespace
+
+#if USE_LEMLIB_ODOM
+void set_pose(float x, float y, float heading) {
+	if (odom_ok("set_pose")) chassis.setPose(x, y, heading);
+}
+
+void drive_to(float x, float y, int speed, int timeout_ms) {
+	if (odom_ok("drive_to"))
+		chassis.moveToPoint(x, y, timeout_ms, {.forwards = true, .maxSpeed = (float)clamp_speed(speed)}, false);
+}
+
+void back_to(float x, float y, int speed, int timeout_ms) {
+	if (odom_ok("back_to"))
+		chassis.moveToPoint(x, y, timeout_ms, {.forwards = false, .maxSpeed = (float)clamp_speed(speed)}, false);
+}
+
+void face(float x, float y, int speed, int timeout_ms) {
+	if (odom_ok("face"))
+		chassis.turnToPoint(x, y, timeout_ms, {.maxSpeed = clamp_speed(speed)}, false);
+}
+
+void face_heading(float heading, int speed, int timeout_ms) {
+	if (odom_ok("face_heading"))
+		chassis.turnToHeading(heading, timeout_ms, {.maxSpeed = clamp_speed(speed)}, false);
+}
+
+void drive_to_pose(float x, float y, float heading, int speed, int timeout_ms) {
+	if (odom_ok("drive_to_pose"))
+		chassis.moveToPose(x, y, heading, timeout_ms, {.forwards = true, .maxSpeed = (float)clamp_speed(speed)}, false);
+}
+
+void back_to_pose(float x, float y, float heading, int speed, int timeout_ms) {
+	if (odom_ok("back_to_pose"))
+		chassis.moveToPose(x, y, heading, timeout_ms, {.forwards = false, .maxSpeed = (float)clamp_speed(speed)}, false);
+}
+#else
+void set_pose(float, float, float) { odom_ok("set_pose"); }
+void drive_to(float, float, int, int) { odom_ok("drive_to"); }
+void back_to(float, float, int, int) { odom_ok("back_to"); }
+void face(float, float, int, int) { odom_ok("face"); }
+void face_heading(float, int, int) { odom_ok("face_heading"); }
+void drive_to_pose(float, float, float, int, int) { odom_ok("drive_to_pose"); }
+void back_to_pose(float, float, float, int, int) { odom_ok("back_to_pose"); }
+#endif
 
 // ================================== lift ==========================================
 namespace { double lift_target = LIFT_DOWN_DEG; }

@@ -19,6 +19,12 @@
 //   intake(speed)  spin_claw(speed)
 //   score()   = lift_goal, lift_wait, claw_out, claw_drop, claw_up in one go
 //
+// LemLib (go to a spot on the field, see include/auton_cmds.h for the coordinates):
+//   drive_to(x, y, speed)   back_to(x, y, speed)     drive there front / back first
+//   face(x, y)   face_heading(degrees)               turn in place
+//   drive_to_pose(x, y, heading)   back_to_pose(...) curve in, arrive facing heading
+//   set_pose(x, y, heading)                           "you are here" (e.g. against a wall)
+//
 // Speed is 0-127 (for drive_time it also sets the direction: negative = backwards).
 // You can also set the PID for a single command: move(24, 100, 6.0, 0.3)
 //
@@ -32,22 +38,18 @@
 // =============================================================================
 
 void run_routine() {
-	// ---- 1. Hit the Toggle twice -------------------------------------------
-	drive_time(-50,500);
-	drive_time(127, 900);
-	wait(150);        // hit 1: drive in
-	drive_time(-50, 600);        // back up
-	wait(150);                   // let the Toggle stop moving
+	// 1. Hit the Toggle twice 
+	drive_time(-50,500);//backup
+	drive_time(127, 900);//forward
+	wait(150); //wait
+	drive_time(-50, 600);        // back up        
 	drive_time(127, 950);        // hit 2: drive in
+	wait(150);           
 	drive_time(-95, 350);        // back off the Toggle a little
 
-	// ---- 2. Go to our goal and score ---------------------------------------                // lift starts rising while we drive
+	//2. score preloaded pin               
 	turn(mirror(-85), 100);      // turn so the BACK (claw side) faces our goal
 	move(-45, 50);              // reverse toward the goal
-
-	// ---- 3. Score: each step on its own, so you can reorder / retime them --
-                // start the lift rising
-                // wait until it is up
 	claw_out();                  // claw vertical -> horizontal
 	claw_drop();                 // claw spin (A button) to drop the pin
 	claw_up();                   // claw slightly up (B's 2nd press)

@@ -13,11 +13,13 @@
 
 namespace {
 bool imu_ready = false;
+bool odom_ready = false;
 }
 
-// Gets the IMU ready (its heading is all the auton commands need). LemLib's own
-// odometry is NOT started any more: it crashed the brain at startup, and move()/
-// turn() don't use it. That also means the Brain's TUNE screen is unavailable.
+// Calibrates the IMU, then starts LemLib odometry (tracking the robot's position).
+// If startup freezes, the Brain screen line says which step it is stuck on, and
+// `pros terminal` shows the last DBG line printed.
+// Set USE_LEMLIB_ODOM to 0 in robot-config.h to go back to IMU-only.
 void auton_init() {
 	if (imu_ready) return;
 	// The IMU can take a moment to enumerate after power-on.
@@ -28,19 +30,33 @@ void auton_init() {
 	}
 	if (imu_present) {
 		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "imu: calibrating...               ");
+		printf("DBG imu calibrate start\n");
 		imu.reset(true);   // blocks ~2-3 s until calibrated
+		printf("DBG imu calibrate done\n");
 		imu_ready = true;
+#if USE_LEMLIB_ODOM
+		// false = skip LemLib's own IMU calibration. Its wait loop has no timeout
+		// and froze startup; the IMU is already calibrated above.
+		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "odom: starting...                 ");
+		printf("DBG odom start\n");
+		chassis.calibrate(false);
+		printf("DBG odom done\n");
+		odom_ready = true;
+		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "odom: READY                       ");
+#else
 		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "imu: READY                        ");
+#endif
 	} else {
 		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "imu: NOT FOUND on port %d          ", imu.get_port());
 	}
-	printf("DBG imu_ready=%d\n", imu_ready);
+	printf("DBG imu_ready=%d odom_ready=%d\n", imu_ready, odom_ready);
 }
 
 bool auton_imu_ready() { return imu_ready; }
 
-// LemLib odometry is not used, so the tuning screen (which needs it) stays off.
-bool auton_odom_ready() { return false; }
+// True once LemLib odometry is running. The TUNE screen and the LemLib auton
+// commands (drive_to, face, ...) need it.
+bool auton_odom_ready() { return odom_ready; }
 
 void autonomous() {
 	auton_cmds_reset();

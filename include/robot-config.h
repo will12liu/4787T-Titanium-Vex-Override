@@ -49,7 +49,6 @@ extern lemlib::Chassis chassis;
 extern pros::Motor intake_motor;
 // Add drivetrain motors, IMU, other sensors here as the robot gets built
 #if USE_TRACKING_WHEELS
-extern pros::Distance distance_sensor;
 #if USE_VERTICAL_POD
 extern pros::Rotation vertical_rotation;
 #endif
