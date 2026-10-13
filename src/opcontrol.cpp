@@ -23,10 +23,12 @@
 void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
+	int inverse = 1;
 	bool intake_running = false;
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;
 	bool aux_open = false;
+	int r1_state = 0;
 	// claw_turn is tared once at boot in mech_init(); re-taring here would
 	// shift the flip targets after autonomous.
 	// Cascade brake mode is CASCADE_BRAKE_MODE in mechanisms.h (no active hold).
@@ -64,6 +66,7 @@ void opcontrol() {
 
 		if (std::abs(dir) < 10) dir = 0;
 		if (std::abs(turn) < 10) turn = 0;
+		dir *= inverse;
 
 		int left = std::clamp(dir + turn, -127, 127);
 		int right = std::clamp(dir - turn, -127, 127);
@@ -81,8 +84,9 @@ void opcontrol() {
 
 		// Intake: R1 toggles the intake and the claw spin (A's function) together
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
-			intake_running = !intake_running;
-			claw_spin_out = intake_running;
+			r1_state = (r1_state + 1) % 3;
+			intake_running = (r1_state == 1);
+			claw_spin_out = (r1_state != 0);
 			claw_spin_in = false;
 		}
 		intake_motor.move(intake_running ? 127 : 0);
@@ -96,12 +100,16 @@ void opcontrol() {
 			cascade.move(0);
 		}
 
-		// Claw spin: press A or Y once to spin IN, press again to stop.
-		// (R1 above also starts claw spin out together with the intake.)
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A) ||
-		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
+		// Claw spin: press A once to spin IN, press again to stop.
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
 			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
+		}
+		// Claw spin: press Y once to spin OUT, press again to stop.
+		// (R1 above also starts claw spin out together with the intake.)
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
+			claw_spin_out = !claw_spin_out;
+			claw_spin_in = false;
 		}
 		if (claw_spin_in) {
 			claw_spin.move(45);
