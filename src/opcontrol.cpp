@@ -60,8 +60,14 @@ void opcontrol() {
 			aux_piston_b.set_value(aux_open);
 		}
 		// 1. Drivetrain
-		// Negated: stick down drives forward, stick up drives backward.
-		int dir = -master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+		// R2 toggles inverted driving: the claw side becomes the front, so stick up
+		// drives claw first. Turning stays the same. Rumble: long = inverted, short = normal.
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) {
+			inverse = -inverse;
+			master.rumble(inverse < 0 ? "-" : ".");
+			master.set_text(1, 0, inverse < 0 ? "INVERTED  " : "normal    ");
+		}
+		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
 		if (std::abs(dir) < 10) dir = 0;

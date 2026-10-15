@@ -34,14 +34,15 @@ lemlib::Drivetrain drivetrain(
     &right_motors,
     11.02f,                      // track width (inches), measured 28 cm
     lemlib::Omniwheel::NEW_325,  // 3.25" omni wheels
-    600,                         // drivetrain rpm, direct drive blue
+    384,                         // wheel rpm. Was 600 (direct drive), but pushing 24" read 37.5", so 600 * 24 / 37.5
     2                            // horizontal drift compensation
 );
 
-// PLACEHOLDER PID GAINS — untuned. Requires empirical tuning on real
-// hardware once chassis is finalized. Do not trust these values as-is.
+// Driving PID. kP / kD tuned with DRV+24 on the Brain's TUNE screen 10/13.
+// kP was 28: it braked so hard at the end the robot tipped forward. Raising kP
+// makes it brake later and harder, so watch for tipping if you change it.
 lemlib::ControllerSettings lateral_controller(
-    28,   // kP (was 10; higher = faster, more power, can overshoot)
+    13,   // kP
     0,    // kI
     3,    // kD
     3,    // anti-windup range
@@ -52,12 +53,12 @@ lemlib::ControllerSettings lateral_controller(
     0     // max acceleration slew
 );
 
-// PLACEHOLDER PID GAINS — untuned. Requires empirical tuning on real
-// hardware once chassis is finalized. Do not trust these values as-is.
+// Turning PID. kP / kD tuned with TURN+90 on the Brain's TUNE screen.
+// Re-tune if the robot's weight or drivetrain changes.
 lemlib::ControllerSettings angular_controller(
-    2,    // kP
+    2,    // kP (tuned on the TUNE screen 10/13)
     0,    // kI
-    10,   // kD
+    7,    // kD (tuned on the TUNE screen 10/13, was 10)
     3,    // anti-windup range
     1,    // small error range (degrees)
     100,  // small error timeout (ms)

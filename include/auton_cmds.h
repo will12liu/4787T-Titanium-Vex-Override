@@ -84,6 +84,15 @@ void claw_up();
 // Spin the claw to drop the pin (the A button). speed 0-127 (negative = reverse),
 // ms = how long. Leave the numbers out to use CLAW_DROP_SPEED / CLAW_DROP_MS in mechanisms.h.
 void claw_drop(int speed = 1000, int ms = 0);
+// Start flipping the claw to horizontal and keep going right away (does NOT wait),
+// so it flips while the robot drives: claw_out_start(); back_to(...);
+void claw_out_start();
+// Start moving the claw to slightly up (B's 2nd press) and keep going right away
+// (does NOT wait), so it lifts while the robot drives.
+void claw_up_start();
+// Drop the pin and lift the claw slightly up AT THE SAME TIME (claw_drop + claw_up
+// together). Waits for the flip from claw_out_start() to finish first.
+void claw_drop_up(int speed = 1000, int ms = 0);
 
 // ---- Intake / claw spin --------------------------------------------------------
 void intake(int speed);         // intake roller, 0 = stop, negative = reverse

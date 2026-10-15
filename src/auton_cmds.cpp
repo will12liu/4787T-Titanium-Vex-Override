@@ -271,7 +271,7 @@ void lift_wait(int timeout_ms) { auton_status("lift_wait"); if (!stopped()) ::li
 
 // ================================== claw ==========================================
 void claw_in() { auton_status("claw_in"); claw_flip(false); claw_flip_wait(2000); }
-void claw_out() { auton_status("claw_out"); claw_flip(true); claw_flip_wait(1000); }
+void claw_out() { auton_status("claw_out"); claw_flip(true); claw_flip_wait(200); }
 void claw_up() { auton_status("claw_up"); if (!stopped()) claw_lift_off(); }
 void claw_drop(int speed, int ms) {
 	auton_status("claw_drop");
@@ -279,6 +279,24 @@ void claw_drop(int speed, int ms) {
 	if (ms <= 0) ms = CLAW_DROP_MS;
 	claw_spin.move(speed);
 	wait(ms);
+	claw_spin.move(0);
+}
+
+void claw_up_start() {
+	auton_status("claw_up_start");
+	claw_turn_horizontal = true;
+	claw_turn.move_absolute(CLAW_TURN_LIFT_DEG, CLAW_TURN_VELOCITY);
+}
+void claw_drop_up(int speed, int ms) {
+	auton_status("claw_drop_up");
+	if (speed == 1000) speed = CLAW_DROP_SPEED;
+	if (ms <= 0) ms = CLAW_DROP_MS;
+	claw_flip_wait(1000);   // the flip started while driving; usually already done
+	if (stopped()) return;
+	uint32_t end = pros::millis() + ms;
+	claw_spin.move(speed);
+	claw_lift_off();        // lifts while the claw spins
+	while (pros::millis() < end && !stopped()) pros::delay(10);
 	claw_spin.move(0);
 }
 
