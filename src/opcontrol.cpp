@@ -24,18 +24,18 @@ void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 	int inverse = 1;
-	// The drive direction ramps between +1 and -1 instead of snapping, so hitting R2
+	// The drive direction ramps between +1 and -1 instead of snapping, so hitting D-pad Up
 	// at full speed doesn't slam the motors from +127 to -127 in one loop (wheel spin,
 	// current spike, the robot stalls for a moment).
 	double inverse_scale = 1.0;
 	const double INVERSE_RAMP_STEP = 0.25;   // per 20 ms loop: full flip takes ~160 ms
-	uint32_t inverse_rumble_at = 0;          // rumble a moment after the text: the controller drops back-to-back sends
 	master.print(2, 0, "DRIVE: FWD");
 	bool intake_running = false;
+	bool intake_reversed = false;
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;
-	bool aux_open = false;
 	int r1_state = 0;
+	bool cascade_intake_active = false;
 	// claw_turn is tared once at boot in mech_init(); re-taring here would
 	// shift the flip targets after autonomous.
 	// Cascade brake mode is CASCADE_BRAKE_MODE in mechanisms.h (no active hold).
@@ -53,6 +53,7 @@ void opcontrol() {
 		if (!pros::competition::is_connected() && !tuning_active() &&
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
 			autonomous();
+			cascade_intake_active = false;
 			claw_turn_state = 0;
 			claw_turn_target = CLAW_TURN_VERTICAL_DEG;
 			claw_turn_horizontal = false;
@@ -60,19 +61,22 @@ void opcontrol() {
 			// snapping it back to vertical as soon as driver control resumes.
 			if (estop_triggered()) claw_turn_target = claw_turn.get_position();
 			intake_running = false;
+			intake_reversed = false;
 			claw_spin_in = false;
 			claw_spin_out = false;
-			aux_open = false;
-			aux_piston_a.set_value(aux_open);
-			aux_piston_b.set_value(aux_open);
 		}
 		// 1. Drivetrain
-		// R2 toggles inverted driving: the claw side becomes the front, so stick up
+		// D-pad Up toggles inverted driving: the claw side becomes the front, so stick up
 		// drives claw first. Turning stays the same. Rumble: long = inverted, short = normal.
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)) {
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP)) {
 			inverse = -inverse;
 			master.rumble(inverse < 0 ? "-" : ".");
 			master.set_text(1, 0, inverse < 0 ? "INVERTED  " : "normal    ");
+		}
+		if (inverse_scale < inverse) {
+			inverse_scale = std::min(inverse_scale + INVERSE_RAMP_STEP, double(inverse));
+		} else if (inverse_scale > inverse) {
+			inverse_scale = std::max(inverse_scale - INVERSE_RAMP_STEP, double(inverse));
 		}
 		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
@@ -99,16 +103,32 @@ void opcontrol() {
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
 			r1_state = (r1_state + 1) % 3;
 			intake_running = (r1_state == 1);
+			intake_reversed = false;
 			claw_spin_out = (r1_state != 0);
 			claw_spin_in = false;
+			cascade_intake_active = (r1_state == 1);
 		}
-		intake_motor.move(intake_running ? 127 : 0);
+		// R2 toggles both motors opposite their R1 directions; press again to stop.
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) && !estop_combo) {
+			intake_reversed = !intake_reversed;
+			intake_running = false;
+			claw_spin_in = false;
+			claw_spin_out = false;
+		}
+		intake_motor.move(intake_reversed ? -127 : (intake_running ? 127 : 0));
 
-		// Cascade: L1 up, L2 down
-		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !estop_combo) {
+		// R1 moves to the intake height. Manual controls cancel that target.
+		if (estop_combo) {
+			cascade_intake_active = false;
+			cascade.move(0);
+		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+			cascade_intake_active = false;
 			cascade.move(127);
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+			cascade_intake_active = false;
 			cascade.move(-85);
+		} else if (cascade_intake_active) {
+			lift_to(cascade_intake_deg, 45);
 		} else {
 			cascade.move(0);
 		}
@@ -124,7 +144,9 @@ void opcontrol() {
 			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
 		}
-		if (claw_spin_in) {
+		if (intake_reversed) {
+			claw_spin.move(127);
+		} else if (claw_spin_in) {
 			claw_spin.move(45);
 		} else if (claw_spin_out) {
 			claw_spin.move(-127);
@@ -132,24 +154,22 @@ void opcontrol() {
 			claw_spin.move(0);
 		}
 
-				// Claw turn: B cycles vertical -> horizontal -> lifted -> vertical
+				// Claw turn: B cycles vertical -> lifted -> vertical -> horizontal -> vertical
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			claw_turn_state = (claw_turn_state + 1) % 3;
+			claw_turn_state = (claw_turn_state + 1) % 4;
 			if (claw_turn_state == 1) {
-				claw_turn_target = CLAW_TURN_HORIZONTAL_DEG;
-			} else if (claw_turn_state == 2) {
+				claw_turn_target = CLAW_TURN_HIGHEST_DEG;
+			} 
+			else if (claw_turn_state == 2) {
 				claw_turn_target = claw_turn_lift_deg;
-			} else {
+			} 
+			else if (claw_turn_state == 3) {
+				claw_turn_target = CLAW_TURN_HORIZONTAL_DEG;
+			}
+			else {
 				claw_turn_target = CLAW_TURN_VERTICAL_DEG;
 			}
 			claw_turn_horizontal = (claw_turn_state != 0);  // keep shared flag in sync with auton
-		}
-
-		// Two aux pistons: D-pad UP toggles open/close together
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP)) {
-			aux_open = !aux_open;
-			aux_piston_a.set_value(aux_open);
-			aux_piston_b.set_value(aux_open);
 		}
 
 		// Re-issue every loop so the motor's position PID keeps fighting gravity

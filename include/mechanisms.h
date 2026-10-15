@@ -10,14 +10,15 @@
 // Vertical = where the claw sits at boot (position tared to 0). Horizontal is 940
 // degrees of travel from there (it was 60 -> 1000, same travel, but the 60 made the
 // claw drive up the moment driver control started).
-constexpr double CLAW_TURN_VERTICAL_DEG = 0.0;
+constexpr double CLAW_TURN_VERTICAL_DEG = 25.0;
 constexpr double CLAW_TURN_HORIZONTAL_DEG = 900.0;
+constexpr double cascade_intake_deg = 180.0;  // cascade motor position to run the intake (claw side) at a low speed
 // B button's 2nd press: the claw lifts a bit past horizontal (off the cone / goal).
 // It is a fraction of the vertical-to-horizontal travel past horizontal: 0.25 = 235 deg
 // past horizontal. Lower = less lift. If it lifts the wrong way, use a negative number.
 constexpr double CLAW_LIFT_FRACTION = 0.25;
-constexpr double CLAW_TURN_LIFT_DEG = CLAW_TURN_HORIZONTAL_DEG +
-	(CLAW_TURN_HORIZONTAL_DEG - CLAW_TURN_VERTICAL_DEG) * CLAW_LIFT_FRACTION;
+constexpr double CLAW_TURN_LIFT_DEG = 2*CLAW_TURN_HORIZONTAL_DEG * CLAW_LIFT_FRACTION;
+constexpr double CLAW_TURN_HIGHEST_DEG = CLAW_TURN_HORIZONTAL_DEG + CLAW_TURN_LIFT_DEG;
 // Dropping the pin = the A button's claw spin. Speed 127 = A's spin, if it spins the
 // wrong way for dropping use -127. Time is how long it spins.
 constexpr int CLAW_DROP_SPEED = 127;
