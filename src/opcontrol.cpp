@@ -24,6 +24,13 @@ void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 	int inverse = 1;
+	// The drive direction ramps between +1 and -1 instead of snapping, so hitting R2
+	// at full speed doesn't slam the motors from +127 to -127 in one loop (wheel spin,
+	// current spike, the robot stalls for a moment).
+	double inverse_scale = 1.0;
+	const double INVERSE_RAMP_STEP = 0.25;   // per 20 ms loop: full flip takes ~160 ms
+	uint32_t inverse_rumble_at = 0;          // rumble a moment after the text: the controller drops back-to-back sends
+	master.print(2, 0, "DRIVE: FWD");
 	bool intake_running = false;
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;
@@ -60,13 +67,25 @@ void opcontrol() {
 			aux_piston_b.set_value(aux_open);
 		}
 		// 1. Drivetrain
-		// Negated: stick down drives forward, stick up drives backward.
-		int dir = -master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+		// R2 toggles forward/reverse driving; steering keeps its usual direction.
+		// Ignored while the tuning screen is open so it can't silently flip the drive.
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) && !tuning_active()) {
+			inverse = -inverse;
+			master.print(2, 0, inverse > 0 ? "DRIVE: FWD" : "DRIVE: REV");
+			inverse_rumble_at = pros::millis() + 60;
+		}
+		if (inverse_rumble_at != 0 && pros::millis() >= inverse_rumble_at) {
+			master.rumble(inverse > 0 ? "." : "--");   // short = forward, long = reversed
+			inverse_rumble_at = 0;
+		}
+		inverse_scale = std::clamp((double)inverse, inverse_scale - INVERSE_RAMP_STEP,
+		                           inverse_scale + INVERSE_RAMP_STEP);
+		int dir = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int turn = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
 		if (std::abs(dir) < 10) dir = 0;
 		if (std::abs(turn) < 10) turn = 0;
-		dir *= inverse;
+		dir = (int)std::lround(dir * inverse_scale);
 
 		int left = std::clamp(dir + turn, -127, 127);
 		int right = std::clamp(dir - turn, -127, 127);
