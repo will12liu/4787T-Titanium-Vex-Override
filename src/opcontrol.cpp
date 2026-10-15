@@ -24,6 +24,13 @@ void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 	int inverse = 1;
+	// The drive direction ramps between +1 and -1 instead of snapping, so hitting R2
+	// at full speed doesn't slam the motors from +127 to -127 in one loop (wheel spin,
+	// current spike, the robot stalls for a moment).
+	double inverse_scale = 1.0;
+	const double INVERSE_RAMP_STEP = 0.25;   // per 20 ms loop: full flip takes ~160 ms
+	uint32_t inverse_rumble_at = 0;          // rumble a moment after the text: the controller drops back-to-back sends
+	master.print(2, 0, "DRIVE: FWD");
 	bool intake_running = false;
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;
@@ -72,7 +79,7 @@ void opcontrol() {
 
 		if (std::abs(dir) < 10) dir = 0;
 		if (std::abs(turn) < 10) turn = 0;
-		dir *= inverse;
+		dir = (int)std::lround(dir * inverse_scale);
 
 		int left = std::clamp(dir + turn, -127, 127);
 		int right = std::clamp(dir - turn, -127, 127);
