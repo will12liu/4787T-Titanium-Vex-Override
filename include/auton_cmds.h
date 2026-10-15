@@ -8,26 +8,10 @@
 // =============================================================================
 
 // ---- Driving -----------------------------------------------------------------
-// Drive straight `inches` (negative = backwards), using the encoders + a PID that
-// slows down near the target, and the IMU to stay straight.
-//   speed   = top speed 0-127
-//   kP, kD  = leave out to use the current default (set by move_pid). Per-call
-//             override: move(24, 100, 6.0, 0.3)
-//   timeout = give up after this many ms. 0 = automatic.
-void move(float inches, int speed = 100, float kP = -1, float kD = -1, int timeout_ms = 0);
-
 // Drive straight at `speed` for `ms` milliseconds, no distance sensing. Good for
-// pushing into things. Negative speed = backwards. Stays straight using the IMU.
+// pushing into things. Negative speed = backwards. Uses the IMU to keep facing
+// the way the robot faced when it started.
 void drive_time(int speed, int ms);
-
-// ---- Turning -----------------------------------------------------------------
-// Turn `degrees` from where the robot is facing now. Positive = clockwise (right),
-// negative = counter-clockwise (left). Uses the IMU + a PID.
-void turn(float degrees, int speed = 100, float kP = -1, float kD = -1, int timeout_ms = 0);
-
-// Turn to face `degrees` measured from the way the robot was facing when the auton
-// started (0 = the start direction, positive = clockwise).
-void turn_to(float degrees_from_start, int speed = 100, float kP = -1, float kD = -1, int timeout_ms = 0);
 
 // ---- LemLib (odometry): go to a spot on the field -------------------------------
 // The robot always knows where it is as (x, y, heading), in inches and degrees.
@@ -36,7 +20,7 @@ void turn_to(float degrees_from_start, int speed = 100, float kP = -1, float kD 
 //   +y        = the way the robot was facing at the start, +x = to its right
 //   heading 0 = facing the start direction, positive = clockwise (90 = facing +x)
 // Because every target is a fixed spot, small errors don't add up from one
-// command to the next like they do with move() / turn().
+// command to the next.
 // Wrap x and headings in mirror() for a LEFT / RIGHT auton: drive_to(mirror(-20), 30).
 // These need odometry. Without it (IMU missing) they do nothing.
 // timeout = give up after this many ms.
@@ -59,13 +43,6 @@ void face_heading(float heading, int speed = 100, int timeout_ms = 1500);
 void drive_to_pose(float x, float y, float heading, int speed = 100, int timeout_ms = 4000);
 void back_to_pose(float x, float y, float heading, int speed = 100, int timeout_ms = 4000);
 
-// ---- PID defaults (apply to every move / turn after this line) -----------------
-//   kP = how hard it pushes per inch (move) or per degree (turn) of error. Bigger =
-//        faster / stronger, but overshoots if too big.
-//   kD = brakes as it closes in. Bigger = less overshoot, but slower to finish.
-void move_pid(float kP, float kD);
-void turn_pid(float kP, float kD);
-
 // ---- Waiting -------------------------------------------------------------------
 void wait(int ms);
 
@@ -81,26 +58,19 @@ void lift_wait(int timeout_ms = 1500);   // wait until the lift has reached its 
 void claw_in();
 void claw_out();
 void claw_up();
+// One B-button press, same as driver control. Each moves the claw and waits.
+//   claw_next()        = intake OFF:     vertical -> highest -> angled -> horizontal (90) -> vertical
+//   claw_next_intake() = intake running: vertical -> highest -> horizontal (90) -> vertical
+// claw_in() / claw_out() / claw_up() also set where the cycle is.
+void claw_next();
+void claw_next_intake();
 // Spin the claw to drop the pin (the A button). speed 0-127 (negative = reverse),
 // ms = how long. Leave the numbers out to use CLAW_DROP_SPEED / CLAW_DROP_MS in mechanisms.h.
 void claw_drop(int speed = 1000, int ms = 0);
-// Start flipping the claw to horizontal and keep going right away (does NOT wait),
-// so it flips while the robot drives: claw_out_start(); back_to(...);
-void claw_out_start();
-// Start moving the claw to slightly up (B's 2nd press) and keep going right away
-// (does NOT wait), so it lifts while the robot drives.
-void claw_up_start();
-// Drop the pin and lift the claw slightly up AT THE SAME TIME (claw_drop + claw_up
-// together). Waits for the flip from claw_out_start() to finish first.
-void claw_drop_up(int speed = 1000, int ms = 0);
 
 // ---- Intake / claw spin --------------------------------------------------------
 void intake(int speed);         // intake roller, 0 = stop, negative = reverse
 void spin_claw(int speed);      // claw spin motor, 0 = stop, negative = reverse (stays on until you set 0)
-
-// ---- All-in-one (optional) -----------------------------------------------------
-// Same as: lift_goal(); lift_wait(); claw_out(); claw_drop(); claw_up();
-void score();
 
 // ---- Which auton was picked (for mirroring) ------------------------------------
 bool on_right();                // true if RIGHT was selected
@@ -108,7 +78,7 @@ bool on_left();                 // true if LEFT was selected
 bool is_red();
 bool is_blue();
 // Flips the sign for a RIGHT auton, so you write the LEFT version once.
-//   turn(mirror(-85));   // turns left on LEFT, right on RIGHT
+//   face_heading(mirror(-85));   // faces left on LEFT, right on RIGHT
 float mirror(float degrees);
 
 // ---- Internal: used by autonomous.cpp ------------------------------------------

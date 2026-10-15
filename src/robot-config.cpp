@@ -27,7 +27,6 @@ pros::Imu imu (8);
 pros::Motor intake_motor(18, pros::MotorGears::green);
 
 
-#if USE_LEMLIB_ODOM
 // Measured on the robot.
 lemlib::Drivetrain drivetrain(
     &left_motors,
@@ -72,24 +71,13 @@ lemlib::ControllerSettings angular_controller(
 #if USE_VERTICAL_POD
 pros::Rotation vertical_rotation(12);
 #endif
-
-// PLACEHOLDER OFFSETS — update once tracking wheel mounting is finalized (offset is distance from tracking center, in inches)
-// Vertical pod (optional, USE_VERTICAL_POD): offset is how far it sits left (-) or right (+)
-// of the robot's turning center. If pose y goes DOWN when you push the robot forward,
-// reverse the port (-12).
 #if USE_VERTICAL_POD
 lemlib::TrackingWheel vertical_tracking_wheel(&vertical_rotation, lemlib::Omniwheel::NEW_2, -1);
 #endif
-// Horizontal pod: offset is how far it sits behind (-) or in front of (+) the robot's turning
-// center. It MUST be measured; a wrong offset adds fake sideways movement whenever the
-// robot turns. If pose x goes DOWN when you slide the robot to the right, reverse the port.
 #if USE_HORIZONTAL_POD
 lemlib::TrackingWheel horizontal_tracking_wheel(&horiz_odom, lemlib::Omniwheel::NEW_2, -2);
 #endif
 
-// Odometry: forward/back distance from the vertical pod if there is one, otherwise from
-// the drive motor encoders (LemLib falls back to them on nullptr). Sideways from the
-// horizontal pod if there is one. Heading from the IMU.
 lemlib::OdomSensors sensors(
 #if USE_VERTICAL_POD
     &vertical_tracking_wheel,
@@ -106,8 +94,6 @@ lemlib::OdomSensors sensors(
     &imu
 );
 #else
-// Drivetrain-only odometry: no tracking wheels, LemLib uses the drive motor
-// encoders for distance and the IMU for heading.
 lemlib::OdomSensors sensors(
     nullptr,
     nullptr,
@@ -118,6 +104,5 @@ lemlib::OdomSensors sensors(
 #endif
 
 lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
-#endif
 
 bool claw_turn_horizontal = false;

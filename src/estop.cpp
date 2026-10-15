@@ -8,9 +8,7 @@ bool armed = false;
 bool triggered = false;
 
 void stop_everything() {
-#if USE_LEMLIB_ODOM
 	chassis.cancelAllMotions();   // otherwise LemLib keeps driving the motors
-#endif
 	left_motors.move(0);
 	right_motors.move(0);
 	cascade.move(0);

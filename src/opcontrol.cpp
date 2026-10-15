@@ -154,9 +154,11 @@ void opcontrol() {
 			claw_spin.move(0);
 		}
 
-				// Claw turn: B cycles vertical -> lifted -> vertical -> horizontal -> vertical
+		// Claw turn: B cycles vertical -> highest -> lifted -> horizontal -> vertical.
+		// With the intake running (R1) it skips the lifted angle: highest -> horizontal.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
 			claw_turn_state = (claw_turn_state + 1) % 4;
+			if (intake_running && claw_turn_state == 2) claw_turn_state = 3;
 			if (claw_turn_state == 1) {
 				claw_turn_target = CLAW_TURN_HIGHEST_DEG;
 			} 

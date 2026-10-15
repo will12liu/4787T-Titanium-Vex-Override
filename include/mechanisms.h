@@ -52,11 +52,6 @@ constexpr double LIFT_SHORT_GOAL_DEG = lift_deg_for_height(5.77 + LIFT_CLEARANCE
 constexpr double LIFT_TALL_GOAL_DEG = lift_deg_for_height(8.77 + LIFT_CLEARANCE_IN, 1100.0);
 constexpr int LIFT_VELOCITY = 200;
 
-// ---- Timing, ms. PLACEHOLDER — tune on hardware ----------------------------
-constexpr int CLAW_PISTON_SETTLE_MS = 250;   // time for the piston to fully open/close
-constexpr int INTAKE_GRAB_SETTLE_MS = 500;   // intake run time after reaching a pin
-constexpr int PIN_DROP_SETTLE_MS = 300;      // time for a released pin to clear the claw
-
 // Call once from initialize() with the lift fully down and the claw vertical.
 void mech_init();
 
@@ -74,18 +69,5 @@ bool claw_flip_wait(int timeout_ms, double tol_deg = 30.0);
 // Move the claw to the 'slightly up' position (B's 2nd press) and wait for it.
 bool claw_lift_off(int timeout_ms = 1500, double tol_deg = 30.0);
 
-// Pneumatic claw jaw. No-op when USE_CLAW_PISTON is 0.
-void claw_set_open(bool open);
-
-// ---- Composite actions used by autonomous ----------------------------------
-// Prepare to take a pin: claw open, intake running. Call before driving onto a pin.
-void grab_pin_start();
-// Finish taking a pin: let the intake settle, close the claw, stop the intake.
-void grab_pin_finish();
-// Blocking. Assumes a pin is held and the robot is positioned at the goal:
-// lift to lift_deg, flip the claw to horizontal, spin the claw (A button) to drop the
-// pin, then move the claw to the slightly-up position (B's 2nd press). Leaves the
-// lift up.
-void score_pin(double lift_deg);
 // Stop every non-drive motor.
 void mech_stop_all();

@@ -8,7 +8,7 @@
 
 // =============================================================================
 // Auton startup + entry point. The routine you edit is in src/routine.cpp and the
-// commands it uses (move, turn, ...) are in src/auton_cmds.cpp.
+// commands it uses (back_to, face_heading, ...) are in src/auton_cmds.cpp.
 // =============================================================================
 
 namespace {
@@ -19,7 +19,6 @@ bool odom_ready = false;
 // Calibrates the IMU, then starts LemLib odometry (tracking the robot's position).
 // If startup freezes, the Brain screen line says which step it is stuck on, and
 // `pros terminal` shows the last DBG line printed.
-// Set USE_LEMLIB_ODOM to 0 in robot-config.h to go back to IMU-only.
 void auton_init() {
 	if (imu_ready) return;
 	// The IMU can take a moment to enumerate after power-on.
@@ -34,7 +33,6 @@ void auton_init() {
 		imu.reset(true);   // blocks ~2-3 s until calibrated
 		printf("DBG imu calibrate done\n");
 		imu_ready = true;
-#if USE_LEMLIB_ODOM
 		// false = skip LemLib's own IMU calibration. Its wait loop has no timeout
 		// and froze startup; the IMU is already calibrated above.
 		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "odom: starting...                 ");
@@ -43,9 +41,6 @@ void auton_init() {
 		printf("DBG odom done\n");
 		odom_ready = true;
 		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "odom: READY                       ");
-#else
-		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "imu: READY                        ");
-#endif
 	} else {
 		pros::screen::print(pros::E_TEXT_MEDIUM, 6, "imu: NOT FOUND on port %d          ", imu.get_port());
 	}
@@ -63,7 +58,7 @@ void autonomous() {
 	auton_status("start");
 	estop_arm();   // L1 + R1 stops the run (test runs only, never in a match)
 
-	if (!imu_ready) auton_status("NO IMU: turns skipped");
+	if (!odom_ready) auton_status("NO IMU: LemLib moves skipped");
 	run_routine();   // the routine itself lives in src/routine.cpp
 
 	estop_disarm();
@@ -71,9 +66,4 @@ void autonomous() {
 	right_motors.move(0);
 	mech_stop_all();
 	auton_status(estop_triggered() ? "E-STOPPED" : "end");
-}
-
-// Same as autonomous() (nothing calls this any more now that R2 is removed).
-void auton_drive_test() {
-	autonomous();
 }

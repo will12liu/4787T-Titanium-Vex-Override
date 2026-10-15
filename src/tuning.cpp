@@ -10,40 +10,25 @@ namespace {
 
 bool active = false;
 
-#if USE_LEMLIB_ODOM
-
-// ---- Layout (Brain screen is 480 x 240) ------------------------------------
-// Readouts on top, three rows of five buttons below.
 constexpr int LINE_H = 20;
 constexpr int BTN_ROW_Y[3] = {114, 156, 198};
 constexpr int BTN_H = 38;
 constexpr int BTN_W = 92;
 constexpr int BTN_PITCH = 96;
 
-// The entry button on the normal screen, clear of the port check text.
-constexpr int TUNE_X0 = 405, TUNE_Y0 = 2, TUNE_X1 = 475, TUNE_Y1 = 44;
 
-// ---- Gains being edited -----------------------------------------------------
-// Loaded from robot-config.cpp the first time the screen opens (not at static
-// init, where the other file's values may not be set yet).
+constexpr int TUNE_X0 = 405, TUNE_Y0 = 2, TUNE_X1 = 475, TUNE_Y1 = 44;
 struct Gains { float kP; float kI; float kD; };
 Gains ang = {0, 0, 0};
 Gains lat = {0, 0, 0};
 bool gains_loaded = false;
-bool editing_lat = false;   // false = turning (angular), true = driving (lateral)
-
+bool editing_lat = false;  
 constexpr float STEPS[4] = {0.1f, 0.5f, 1.0f, 5.0f};
 int step_i = 1;
-
-// Drive encoder readings at the last ZERO, so the readout starts at 0 without
-// taring the motors (taring would make the odometry jump).
 double left_zero_deg = 0;
 double right_zero_deg = 0;
-
 char result1[48] = "tap a test";
 char result2[48] = "";
-
-// ---- Helpers ---------------------------------------------------------------
 float wrap180(float a) {
 	a = std::fmod(a + 180.0f, 360.0f);
 	if (a < 0) a += 360.0f;
@@ -51,25 +36,19 @@ float wrap180(float a) {
 }
 
 double enc_to_in(double deg) {
-	// Blue cartridge positions are output-shaft degrees at 600 rpm.
 	return deg / 360.0 * M_PI * drivetrain.wheelDiameter * (drivetrain.rpm / 600.0);
 }
-
-// The chassis PIDs have const gains, so rebuild them in place. Only call
-// while no motion is running. signFlipReset = true matches LemLib's own setup.
 void apply_gains() {
 	chassis.angularPID.~PID();
 	new (&chassis.angularPID) lemlib::PID(ang.kP, ang.kI, ang.kD, angular_controller.windupRange, true);
 	chassis.lateralPID.~PID();
 	new (&chassis.lateralPID) lemlib::PID(lat.kP, lat.kI, lat.kD, lateral_controller.windupRange, true);
 }
-
 void clear_rect(int x0, int y0, int x1, int y1) {
 	pros::screen::set_pen(pros::Color::black);
 	pros::screen::fill_rect(x0, y0, x1, y1);
 	pros::screen::set_pen(pros::Color::white);
 }
-
 void draw_btn(int col, int row, const char* label, bool highlight = false) {
 	int x0 = 2 + col * BTN_PITCH;
 	int y0 = BTN_ROW_Y[row];
@@ -79,8 +58,6 @@ void draw_btn(int col, int row, const char* label, bool highlight = false) {
 	pros::screen::draw_rect(x0, y0, x0 + BTN_W, y0 + BTN_H);
 	pros::screen::print(pros::E_TEXT_MEDIUM, x0 + 6, y0 + 10, "%s", label);
 }
-
-// Returns the button index (row * 5 + col) under a tap, or -1.
 int hit(int x, int y) {
 	for (int row = 0; row < 3; row++) {
 		if (y < BTN_ROW_Y[row] || y > BTN_ROW_Y[row] + BTN_H) continue;
@@ -95,27 +72,22 @@ int hit(int x, int y) {
 void draw_buttons() {
 	char step_label[16];
 	snprintf(step_label, sizeof(step_label), "STEP %.1f", STEPS[step_i]);
-	// Row 0: tests
 	draw_btn(0, 0, "TURN+90");
 	draw_btn(1, 0, "TURN-90");
 	draw_btn(2, 0, "DRV+24");
 	draw_btn(3, 0, "DRV-24");
 	draw_btn(4, 0, "ZERO");
-	// Row 1: gain editing
 	draw_btn(0, 1, editing_lat ? "EDIT LAT" : "EDIT ANG", true);
 	draw_btn(1, 1, "kP -");
 	draw_btn(2, 1, "kP +");
 	draw_btn(3, 1, "kD -");
 	draw_btn(4, 1, "kD +");
-	// Row 2: misc
 	draw_btn(0, 2, "DRIFT 5s");
 	draw_btn(1, 2, "kI -");
 	draw_btn(2, 2, "kI +");
 	draw_btn(3, 2, step_label);
 	draw_btn(4, 2, "EXIT");
 }
-
-// Top 5 lines: pose, raw sensors, both gain sets, last result.
 void draw_readouts() {
 	lemlib::Pose p = chassis.getPose();
 	double l_in = enc_to_in(left_motors.get_position() - left_zero_deg);
@@ -132,17 +104,12 @@ void draw_readouts() {
 	pros::screen::print(pros::E_TEXT_SMALL, 4, 5 * LINE_H, "%s   bat %.0f%%  lift %.0f",
 	                    result2, pros::battery::get_capacity(), cascade.get_position());
 }
-
-// Gives you 1 s to take your hand off the robot after tapping.
 void countdown(const char* name) {
 	snprintf(result1, sizeof(result1), "%s in 1 s, hands off", name);
 	result2[0] = '\0';
 	draw_readouts();
 	pros::delay(1000);
 }
-
-// ---- Tests -----------------------------------------------------------------
-// Turn deg (+ = clockwise) in place. Reports final error, overshoot and time.
 void turn_test(float deg) {
 	countdown(deg > 0 ? "TURN+90" : "TURN-90");
 	chassis.setBrakeMode(pros::E_MOTOR_BRAKE_BRAKE);
@@ -165,22 +132,19 @@ void turn_test(float deg) {
 		result2[0] = '\0';
 		return;
 	}
-	pros::delay(300);   // let it come to rest, then read where it really ended
+	pros::delay(300);  
 	float final_prog = wrap180(chassis.getPose().theta - h0) * sign;
 	float err = std::fabs(deg) - final_prog;   // + = stopped short, - = past target
 	float over = std::fmax(0.0f, max_prog - std::fabs(deg));
 	snprintf(result1, sizeof(result1), "TURN err %+.1f ovr %.1f %lums", err, over, (unsigned long)t);
 	snprintf(result2, sizeof(result2), "err + = short, - = past. timeout 3000ms");
 }
-
-// Drive dist inches straight (+ forward, - backward) along the current heading.
-// Reports error along the line, overshoot, sideways drift, heading drift and time.
 void drive_test(float dist) {
 	countdown(dist > 0 ? "DRV+24" : "DRV-24");
 	chassis.setBrakeMode(pros::E_MOTOR_BRAKE_BRAKE);
 	lemlib::Pose p0 = chassis.getPose();
 	float th = p0.theta * (float)M_PI / 180.0f;
-	float ux = std::sin(th), uy = std::cos(th);   // LemLib: 0 deg faces +y, clockwise
+	float ux = std::sin(th), uy = std::cos(th);   // 0 deg faces +y, clockwise
 	float sign = dist > 0 ? 1.0f : -1.0f;
 	uint32_t t0 = pros::millis();
 	estop_arm();
@@ -211,7 +175,7 @@ void drive_test(float dist) {
 	snprintf(result2, sizeof(result2), "side %+.2fin  hdg %+.1fdeg  (+ = right)", side, hdg);
 }
 
-// Robot sitting still: how far the IMU heading wanders in 5 s.
+// Robot sitting still: how far the IMU heading wanders 
 void drift_test() {
 	countdown("DRIFT");
 	snprintf(result1, sizeof(result1), "DRIFT: don't touch, 5 s");
@@ -264,8 +228,6 @@ void handle(int b) {
 	draw_readouts();
 }
 
-// The button says why it won't open: NO IMU (odom never got ready, check the
-// IMU port) or COMP (a competition switch / field cable is plugged in).
 const char* tune_block_reason() {
 	static char no_imu[16];
 	snprintf(no_imu, sizeof(no_imu), "NO IMU %d", imu.get_port());
@@ -304,16 +266,12 @@ void tuning_task_fn() {
 				draw_tune_entry();
 				last_draw = pros::millis();
 			}
-			// Generous hit area around the button: anywhere in the top-right corner.
 			bool on_tune = t.x >= TUNE_X0 - 25 && t.y <= TUNE_Y1 + 25;
 			if (tapped) {
-				// Shows where the Brain thinks you touched, under the button.
 				pros::screen::set_pen(pros::Color::black);
 				pros::screen::fill_rect(TUNE_X0 - 25, TUNE_Y1 + 2, 479, TUNE_Y1 + 18);
 				pros::screen::set_pen(pros::Color::white);
 				pros::screen::print(pros::E_TEXT_SMALL, TUNE_X0 - 20, TUNE_Y1 + 4, "tap %d,%d", t.x, t.y);
-				// IMU missing at startup: look for it again (it may have been
-				// plugged in since). Calibrating takes ~3 s, keep the robot still.
 				if (on_tune && !auton_odom_ready() && !pros::competition::is_connected()) {
 					pros::screen::set_pen(pros::Color::dim_gray);
 					pros::screen::fill_rect(TUNE_X0, TUNE_Y0, TUNE_X1, TUNE_Y1);
@@ -333,7 +291,6 @@ void tuning_task_fn() {
 				clear_rect(0, 0, 479, 239);
 				draw_buttons();
 				draw_readouts();
-				// Don't let the same finger-down also hit a tuning button.
 				pros::delay(300);
 				pros::screen_touch_status_s_t now = pros::screen::touch_status();
 				last_press = now.press_count;
@@ -344,7 +301,6 @@ void tuning_task_fn() {
 			if (tapped) {
 				int b = hit(t.x, t.y);
 				if (b >= 0) handle(b);
-				// A test can take seconds; ignore taps made while it ran.
 				pros::screen_touch_status_s_t now = pros::screen::touch_status();
 				last_press = now.press_count;
 				last_release = now.release_count;
@@ -359,14 +315,11 @@ void tuning_task_fn() {
 	}
 }
 
-#endif
 
 } // namespace
 
 void tuning_start() {
-#if USE_LEMLIB_ODOM
 	static pros::Task tuning_task(tuning_task_fn);
-#endif
 }
 
 bool tuning_active() { return active; }

@@ -8,12 +8,6 @@ extern pros::MotorGroup right_motors;
 extern pros::MotorGroup left_motors;
 extern pros::MotorGroup cascade;
 
-// LemLib chassis + odometry. Drivetrain-only odom: IMU for heading, drive motor
-// encoders for distance. No tracking wheels are needed for this to work.
-// Requires the IMU to be plugged in; autonomous() falls back to time-based
-// driving if it is not found at startup.
-#define USE_LEMLIB_ODOM 1
-
 // Dedicated tracking wheel pods + distance sensor + claw rotation sensor.
 // Off until they are physically mounted and ports/offsets are confirmed.
 // Turn this on once the horizontal pod is mounted and plugged in; with it on and
@@ -26,10 +20,6 @@ extern pros::MotorGroup cascade;
 #define USE_VERTICAL_POD 0
 #define USE_HORIZONTAL_POD 1
 
-// Pneumatic claw. Off: the claw piston was replaced by aux_piston_a/b (D-pad UP).
-// Auton claw_set_open() does nothing while this is 0.
-#define USE_CLAW_PISTON 0
-
 extern pros::Motor claw_turn;
 extern pros::Motor claw_spin;
 extern pros::adi::Pneumatics aux_piston_a;
@@ -39,13 +29,13 @@ extern pros::Rotation horiz_odom;
 // PLACEHOLDER PORT — update once build team confirms IMU mounting/wiring
 extern pros::Imu imu;
 
-#if USE_LEMLIB_ODOM
+// LemLib chassis + odometry. Needs the IMU; without it the LemLib auton
+// commands are skipped.
 extern lemlib::Drivetrain drivetrain;
 extern lemlib::ControllerSettings lateral_controller;
 extern lemlib::ControllerSettings angular_controller;
 extern lemlib::OdomSensors sensors;
 extern lemlib::Chassis chassis;
-#endif
 extern pros::Motor intake_motor;
 // Add drivetrain motors, IMU, other sensors here as the robot gets built
 #if USE_TRACKING_WHEELS
