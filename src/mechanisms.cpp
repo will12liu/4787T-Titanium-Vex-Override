@@ -6,6 +6,7 @@
 void mech_init() {
 	cascade.tare_position_all();   // _all: plain tare_position() only zeroes the first motor
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // _all, or only the first motor gets it
+	cascade_rotation.set_position(0);   // lift boots fully lowered = 0, same as the motor tare
 	// Boot position = 0 = down (the claw boots slanted; that spot is "down").
 	claw_turn.tare_position();
 	claw_turn_horizontal = false;
@@ -17,12 +18,13 @@ void intake_set(int voltage) {
 	intake_motor.move(voltage);
 }
 
-// The port 20 cascade motor slips, so its own count drifts away from the real lift
-// height. Port 19's count is the real lift position. The lift is moved by a simple
-// controller that reads ONLY port 19 and sends the same power to both motors (aiming
-// each motor by its own count made them fight each other).
+// The cascade motors slip, so their own counts drift away from the real lift height.
+// The lift position comes from the cascade rotation sensor. The lift is moved by a
+// simple controller that reads ONLY the sensor and sends the same power to both motors
+// (aiming each motor by its own count made them fight each other).
 double lift_pos() {
-	return cascade.get_position(1);   // index 1 = port 19 in {-20, 19}
+	// get_position() is centidegrees
+	return cascade_rotation.get_position() / 100.0 / CASCADE_ROTATION_RATIO;
 }
 
 namespace {

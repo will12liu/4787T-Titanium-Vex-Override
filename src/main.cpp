@@ -27,6 +27,7 @@ void build_expected(char* expected) {
 	mark(claw_spin.get_port(), 'M');
 	mark(intake_motor.get_port(), 'M');
 	mark(imu.get_port(), 'I');
+	mark(cascade_rotation.get_port(), 'R');
 #if USE_TRACKING_WHEELS
 #if USE_VERTICAL_POD
 	mark(vertical_rotation.get_port(), 'R');

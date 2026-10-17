@@ -8,6 +8,15 @@ extern pros::MotorGroup right_motors;
 extern pros::MotorGroup left_motors;
 extern pros::MotorGroup cascade;
 
+// Cascade lift position sensor. lift_pos() reads this instead of a motor count.
+// PORT IS A GUESS (unused port): set it to the real port. Negative = reversed.
+constexpr int CASCADE_ROTATION_PORT = 9;
+// Sensor degrees per cascade-motor degree (1.0 if the sensor turns 1:1 with the
+// lift gearing the old motor-degree heights were measured on). Heights in
+// mechanisms.h stay valid if this is right.
+constexpr double CASCADE_ROTATION_RATIO = 1.0;
+extern pros::Rotation cascade_rotation;
+
 // Dedicated tracking wheel pods + distance sensor + claw rotation sensor.
 // Off until they are physically mounted and ports/offsets are confirmed.
 // Turn this on once the horizontal pod is mounted and plugged in; with it on and

@@ -60,7 +60,7 @@ void mech_init();
 void intake_set(int voltage);
 
 // Lift. lift_to() is non-blocking; lift_wait() blocks until within tol or timeout.
-// lift_pos() = lift position from port 19 only (port 20's count drifts).
+// lift_pos() = lift position from the cascade rotation sensor (motor counts drift).
 double lift_pos();
 // Stop aiming at the last lift_to() height. Call before moving the cascade by hand.
 void lift_release();
