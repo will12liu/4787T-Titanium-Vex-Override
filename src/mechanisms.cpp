@@ -5,8 +5,8 @@
 
 void mech_init() {
 	cascade.tare_position_all();   // _all: plain tare_position() only zeroes the first motor
+	lift_rot.reset_position();     // lift sensor zero = lift down at boot
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // _all, or only the first motor gets it
-	cascade_rotation.set_position(0);   // lift boots fully lowered = 0, same as the motor tare
 	// Boot position = 0 = down (the claw boots slanted; that spot is "down").
 	claw_turn.tare_position();
 	claw_turn_horizontal = false;
@@ -18,13 +18,16 @@ void intake_set(int voltage) {
 	intake_motor.move(voltage);
 }
 
-// The cascade motors slip, so their own counts drift away from the real lift height.
-// The lift position comes from the cascade rotation sensor. The lift is moved by a
-// simple controller that reads ONLY the sensor and sends the same power to both motors
-// (aiming each motor by its own count made them fight each other).
+// Lift height from the rotation sensor on the middle axis, so motor slip can't throw it off.
+// If the sensor is unplugged, fall back to the port 19 motor count (the port 20 motor drifts).
 double lift_pos() {
-	// get_position() is centidegrees
-	return cascade_rotation.get_position() / 100.0 / CASCADE_ROTATION_RATIO;
+	int32_t c = lift_rot.get_position();   // centidegrees
+	if (c == PROS_ERR) return cascade.get_position(1);   // index 1 = port 19 in {-20, 19}
+	return c / 100.0 * LIFT_ROT_TO_LIFT;
+}
+
+bool lift_at(double deg, double tol_deg) {
+	return std::fabs(lift_pos() - deg) <= tol_deg;
 }
 
 namespace {
@@ -33,19 +36,25 @@ volatile double lift_goal_deg = 0.0;
 volatile int lift_max_volt = 127;
 
 void lift_task_fn() {
+	bool holding = false;   // inside the dead band: motors stopped, brake mode holds
 	while (true) {
 		if (lift_active) {
-			double err = lift_goal_deg - lift_pos();
-			if (std::fabs(err) < 8.0) cascade.move(0);   // close enough: brake mode holds it
+			double err = lift_goal_deg - lift_pos();   // + = too low, - = too high (over)
+			double a = std::fabs(err);
+			// Hysteresis: stop inside the hold band, but only start correcting again once it has
+			// slipped past the re-correct band, so a small sag doesn't make it buzz.
+			if (a < LIFT_HOLD_BAND_DEG) holding = true;
+			else if (a > LIFT_RECORRECT_DEG) holding = false;
+			if (holding) cascade.move(0);
 			else {
-				// Plain 1 volt per degree ran out of push a few dozen degrees short (the lift
-				// stalled against gravity and friction), so use a bigger gain plus a minimum
-				// push: more going up (against gravity), less coming down.
 				int max_v = lift_max_volt;
 				int v = (int)(3.0 * err);
-				int min_v = err > 0 ? 40 : 15;
-				if (std::abs(v) < min_v) v = err > 0 ? min_v : -min_v;
-				cascade.move(std::clamp(v, -max_v, max_v));
+				if (err > 0) {   // under: push up against gravity
+					v = std::clamp(std::max(v, LIFT_UNDER_MIN_VOLT), LIFT_UNDER_MIN_VOLT, max_v);
+				} else {         // over: come back down gently
+					v = std::clamp(std::min(v, -LIFT_OVER_MIN_VOLT), -std::min(max_v, LIFT_OVER_MAX_VOLT), -LIFT_OVER_MIN_VOLT);
+				}
+				cascade.move(v);
 			}
 		}
 		pros::delay(10);

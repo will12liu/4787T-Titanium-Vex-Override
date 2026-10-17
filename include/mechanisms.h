@@ -46,6 +46,17 @@ constexpr double lift_deg_for_height(double height_in, double fallback_deg) {
 	return LIFT_MAX_DEG <= 0.0 ? fallback_deg
 	     : (height_in - CLAW_HEIGHT_DOWN_IN) / (CLAW_HEIGHT_MAX_IN - CLAW_HEIGHT_DOWN_IN) * LIFT_MAX_DEG;
 }
+// Lift position now comes from the rotation sensor on the middle axis (motor slip can't fool it).
+// Sensor degrees * this = "lift degrees" (the numbers above, like cascade_intake_deg). 1.0 = raw axis
+// degrees; to keep the old motor-degree numbers, set it to (motor degrees / axis degrees) for the lift.
+constexpr double LIFT_ROT_TO_LIFT = 1.0;
+// R1 intake height window (lift degrees). Inside the dead band the lift just holds. Slipping past the
+// re-correct band, it pushes back: up hard if too low, down gently if too high.
+constexpr double LIFT_HOLD_BAND_DEG = 6.0;     // stop correcting once this close
+constexpr double LIFT_RECORRECT_DEG = 14.0;    // start correcting again once this far off
+constexpr int LIFT_UNDER_MIN_VOLT = 40;        // min push going up (against gravity)
+constexpr int LIFT_OVER_MIN_VOLT = 15;         // min push going down
+constexpr int LIFT_OVER_MAX_VOLT = 60;         // cap going down so it can't slam / bounce back up
 constexpr double LIFT_DOWN_DEG = 0.0;
 // Second number is the old guess, used until LIFT_MAX_DEG is measured.
 constexpr double LIFT_ALLIANCE_GOAL_DEG = lift_deg_for_height(3.25 + LIFT_CLEARANCE_IN, 400.0);
@@ -62,6 +73,8 @@ void intake_set(int voltage);
 // Lift. lift_to() is non-blocking; lift_wait() blocks until within tol or timeout.
 // lift_pos() = lift position from the cascade rotation sensor (motor counts drift).
 double lift_pos();
+// true when the lift is within tol_deg of deg (rotation sensor)
+bool lift_at(double deg, double tol_deg = LIFT_HOLD_BAND_DEG + 4.0);
 // Stop aiming at the last lift_to() height. Call before moving the cascade by hand.
 void lift_release();
 void lift_to(double deg, int velocity = LIFT_VELOCITY);
