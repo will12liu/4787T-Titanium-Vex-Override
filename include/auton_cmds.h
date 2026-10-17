@@ -34,6 +34,8 @@ void set_pose(float x, float y, float heading);
 // back_to goes back first (claw side).
 void drive_to(float x, float y, int speed = 100, int timeout_ms = 3000);
 void back_to(float x, float y, int speed = 100, int timeout_ms = 3000);
+// back_straight: back_to without the axis lock, for a slanted straight line.
+void back_straight(float x, float y, int speed = 100, int timeout_ms = 3000);
 // back_past: like back_to but doesn't slow down and settle at the end (stops ~2" early,
 // still moving). Faster, less exact: use it when the next move takes over anyway
 // (e.g. right before a drive_time into the wall).

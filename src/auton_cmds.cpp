@@ -120,6 +120,12 @@ void back_to(float x, float y, int speed, int timeout_ms) {
 	}
 }
 
+// Like back_to but no axis lock: drives a straight slanted line (turns to aim first if needed).
+void back_straight(float x, float y, int speed, int timeout_ms) {
+	if (odom_ok("back_straight"))
+		chassis.moveToPoint(x, y, timeout_ms, {.forwards = false, .maxSpeed = (float)clamp_speed(speed)}, false);
+}
+
 void face(float x, float y, int speed, int timeout_ms) {
 	if (odom_ok("face"))
 		chassis.turnToPoint(x, y, timeout_ms, {.maxSpeed = clamp_speed(speed)}, false);

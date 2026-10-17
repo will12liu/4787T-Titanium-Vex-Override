@@ -22,11 +22,19 @@ void run_routine() {
 	claw_up();
 	lift_secs(300,true); 
 	                           // horizontal -> slanted, waits until it gets there
-// 3. pull away, turn, then back down a slanted line to (18.4, -29.9)
+// 3. pull away, turn, then back down a straight slanted line
+	// The turn is FACE_H (front heading). Backing up travels toward FACE_H + 180, so the end point
+	// is worked out with trig on that heading, down to y = END_Y. Turn more right = bigger FACE_H.
+	const float FACE_H = 326.8f;     // was 309.3, turned right ~17.5 deg
+	const float END_Y = -29.9f;
+	const float back_dir = (FACE_H + 180.0f) * 3.14159265f / 180.0f;
+	const float EXTRA = 12.0f;       // it stopped ~12" short on the field, so aim this much farther down the line
+	const float run = (END_Y - (-17.4f)) / std::cos(back_dir) + EXTRA;  // distance along that heading
+	const float end_x = 5.4f + run * std::sin(back_dir);                // = x at END_Y
 	drive_to(mirror(5.4), -17.4, 100);              // 1) pull away from the goal to x = 5.4
 	lift_secs(300,false);
-	face_heading(mirror(309.3), 100);               // 2) turn to 309.3 (= -50.7)
-	back_to_pose(mirror(18.4), -29.9, mirror(309.3), 100);   // 3) back down the line to the spot
+	face_heading(mirror(FACE_H), 100);              // 2) turn
+	back_straight(mirror(end_x), -17.4f + run * std::cos(back_dir), 100);   // 3) straight line down that heading
 	spin_claw(100);
 	claw_down_45();
 }

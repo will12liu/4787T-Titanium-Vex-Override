@@ -50,6 +50,7 @@ void opcontrol() {
 	double claw_last_cmd = claw_turn_target;
 	uint32_t claw_cmd_ms = pros::millis();
 	bool claw_resting = false;        // down and stopped moving: quit pushing
+	bool claw_intake_tilt = false;    // claw tilted for the intake; stays on until the cascade is well down
 
 	while (true) {
 		// Auton test: D-pad DOWN runs autonomous() once. Only works with no
@@ -201,8 +202,13 @@ void opcontrol() {
 		// it only comes back up once the cascade is lowered.
 		double claw_cmd = claw_turn_target;
 		if (claw_turn_state == 0 && !claw_hold_here) {
-			bool intake_up = cascade_intake_active || lift_pos() >= CLAW_CLEAR_CASCADE_DEG;
-			claw_cmd = intake_up ? CLAW_TURN_INTAKE_DEG : CLAW_TURN_VERTICAL_DEG;
+			// Latched with a gap: once tilted, the claw stays tilted until the cascade is
+			// well below the intake height. Otherwise a cascade that sags a little after
+			// R1 drops under the line and the claw pops back up on its own.
+			double lp = lift_pos();
+			if (cascade_intake_active || lp >= CLAW_CLEAR_CASCADE_DEG) claw_intake_tilt = true;
+			else if (lp < CLAW_CLEAR_CASCADE_DEG - 120.0) claw_intake_tilt = false;
+			claw_cmd = claw_intake_tilt ? CLAW_TURN_INTAKE_DEG : CLAW_TURN_VERTICAL_DEG;
 		}
 		if (claw_cmd != claw_last_cmd) {
 			claw_last_cmd = claw_cmd;
