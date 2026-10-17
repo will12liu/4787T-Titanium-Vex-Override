@@ -10,15 +10,16 @@
 // Claw angles are motor degrees from where the claw sits at boot (tared to 0 in
 // mech_init). The claw boots slanted (~25 deg), and that slanted spot IS "down".
 // About 10 motor degrees per claw degree, so claw angle ~= 25 + number / 10.
-constexpr double CLAW_TURN_VERTICAL_DEG = 75.0;   // down, a bit above the boot spot (X's 2nd press)
-constexpr double CLAW_TURN_HORIZONTAL_DEG = 750.0; // 90 deg (X's 1st press). 860 was ~105, 760 still too high
-constexpr double CLAW_TURN_LIFT_DEG = 280.0;       // B's 2nd press: small acute angle to pick up pins
-constexpr double CLAW_TURN_HIGHEST_DEG = 1110.0;   // B's 1st press: top angle. 1100 too high, 1025 too low
+constexpr double CLAW_TURN_VERTICAL_DEG = 125.0;   // down, a bit above the boot spot (X's 2nd press)
+constexpr double CLAW_TURN_HORIZONTAL_DEG = 800.0; // 90 deg (X's 1st press). 860 was ~105, 760 still too high
+constexpr double CLAW_TURN_LIFT_DEG = 330.0;       // B's 2nd press: small acute angle to pick up pins
+constexpr double CLAW_TURN_HIGHEST_DEG = 1160.0;   // B's 1st press: top angle. 1100 too high, 1025 too low
 constexpr double cascade_intake_deg = 350.0;  // cascade motor position R1 lifts to for the intake. 300 was a bit high
 // Cascade up (R1 intake): claw drops to slightly slanted. That is below the boot spot,
 // so it only goes there while the cascade is at least CLAW_CLEAR_CASCADE_DEG high.
 // More negative = closer to straight down. -150 was too far, -90 not vertical enough.
-constexpr double CLAW_TURN_INTAKE_DEG = -125.0;
+// ~5 deg irl: 10 motor degrees per claw degree, vertical is ~25 deg, so 200 below it. Tied to vertical so it moves with it.
+constexpr double CLAW_TURN_INTAKE_DEG = CLAW_TURN_VERTICAL_DEG - 200.0;
 constexpr double CLAW_CLEAR_CASCADE_DEG = cascade_intake_deg - 40.0;
 // Dropping the pin = the A button's claw spin. Speed 127 = A's spin, if it spins the
 // wrong way for dropping use -127. Time is how long it spins.
