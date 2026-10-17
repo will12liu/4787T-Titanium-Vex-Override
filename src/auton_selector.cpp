@@ -73,7 +73,10 @@ void selector_task_fn() {
 		if (!pros::competition::is_autonomous()) {
 			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) selected = AutonSide::LEFT;
 			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) selected = AutonSide::RIGHT;
-			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
+			// X is the claw's score button in driver control, so only read it while
+			// disabled (new-press flags are shared, opcontrol would lose X presses).
+			if (pros::competition::is_disabled() &&
+			    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
 				selected_color = selected_color == AutonColor::RED ? AutonColor::BLUE : AutonColor::RED;
 			}
 		}

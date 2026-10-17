@@ -1,6 +1,7 @@
 #include "estop.h"
 #include "main.h"
 #include "robot-config.h"
+#include "mechanisms.h"
 
 namespace {
 
@@ -11,6 +12,7 @@ void stop_everything() {
 	chassis.cancelAllMotions();   // otherwise LemLib keeps driving the motors
 	left_motors.move(0);
 	right_motors.move(0);
+	lift_release();   // stop the lift controller, or it would keep driving the cascade
 	cascade.move(0);
 	intake_motor.move(0);
 	claw_spin.move(0);

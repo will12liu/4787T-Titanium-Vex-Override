@@ -33,6 +33,10 @@ void set_pose(float x, float y, float heading);
 // back_to goes back first (claw side).
 void drive_to(float x, float y, int speed = 100, int timeout_ms = 3000);
 void back_to(float x, float y, int speed = 100, int timeout_ms = 3000);
+// back_past: like back_to but doesn't slow down and settle at the end (stops ~2" early,
+// still moving). Faster, less exact: use it when the next move takes over anyway
+// (e.g. right before a drive_time into the wall).
+void back_past(float x, float y, int speed = 100, int timeout_ms = 3000);
 
 // Turn in place to face the point (x, y), or to face a heading.
 void face(float x, float y, int speed = 100, int timeout_ms = 1500);
@@ -71,6 +75,7 @@ void claw_drop(int speed = 1000, int ms = 0);
 // ---- Intake / claw spin --------------------------------------------------------
 void intake(int speed);         // intake roller, 0 = stop, negative = reverse
 void spin_claw(int speed);      // claw spin motor, 0 = stop, negative = reverse (stays on until you set 0)
+void lift_secs(int ms, bool up);  // run the cascade up (true, like L1) or down (false, like L2) for ms, then stop. Waits until done
 
 // ---- Which auton was picked (for mirroring) ------------------------------------
 bool on_right();                // true if RIGHT was selected

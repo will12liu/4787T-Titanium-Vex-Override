@@ -41,11 +41,15 @@ void opcontrol() {
 	// Cascade brake mode is CASCADE_BRAKE_MODE in mechanisms.h (no active hold).
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // set in mechanisms.h
 	claw_turn.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);   // set here, not at boot: it made the claw twitch
-	// Claw turn states: 0 = down/vertical, 1 = horizontal, 2 = lifted off the cone
+	// Claw turn states: 0 = down/vertical, 1 = highest, 2 = small lifted angle, 3 = horizontal
 	int claw_turn_state = 0;
-	// The 'slightly up' position (2nd B press) is CLAW_TURN_LIFT_DEG in mechanisms.h.
+	// The small lifted angle (2nd B press) is CLAW_TURN_LIFT_DEG in mechanisms.h.
 	const double claw_turn_lift_deg = CLAW_TURN_LIFT_DEG;
 	double claw_turn_target = CLAW_TURN_VERTICAL_DEG;
+	bool claw_hold_here = false;      // after an E-stop: stay where it stopped until B/X/R1
+	double claw_last_cmd = claw_turn_target;
+	uint32_t claw_cmd_ms = pros::millis();
+	bool claw_resting = false;        // down and stopped moving: quit pushing
 
 	while (true) {
 		// Auton test: D-pad DOWN runs autonomous() once. Only works with no
@@ -59,9 +63,11 @@ void opcontrol() {
 			claw_turn_horizontal = false;
 			// E-stopped mid-run: leave the claw flip where it stopped instead of
 			// snapping it back to vertical as soon as driver control resumes.
-			if (estop_triggered()) claw_turn_target = claw_turn.get_position();
+			claw_hold_here = estop_triggered();
+			if (claw_hold_here) claw_turn_target = claw_turn.get_position();
 			intake_running = false;
 			intake_reversed = false;
+			r1_state = 0;
 			claw_spin_in = false;
 			claw_spin_out = false;
 		}
@@ -107,11 +113,17 @@ void opcontrol() {
 			claw_spin_out = (r1_state != 0);
 			claw_spin_in = false;
 			cascade_intake_active = (r1_state == 1);
+			if (r1_state == 1) {   // intake on: claw goes down (tilts to ~10 deg once the cascade is up)
+				claw_turn_state = 0;
+				claw_hold_here = false;
+				claw_turn_horizontal = false;
+			}
 		}
 		// R2 toggles both motors opposite their R1 directions; press again to stop.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) && !estop_combo) {
 			intake_reversed = !intake_reversed;
 			intake_running = false;
+			r1_state = 0;   // next R1 press starts the intake again
 			claw_spin_in = false;
 			claw_spin_out = false;
 		}
@@ -120,16 +132,20 @@ void opcontrol() {
 		// R1 moves to the intake height. Manual controls cancel that target.
 		if (estop_combo) {
 			cascade_intake_active = false;
+			lift_release();
 			cascade.move(0);
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
 			cascade_intake_active = false;
+			lift_release();
 			cascade.move(127);
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
 			cascade_intake_active = false;
+			lift_release();
 			cascade.move(-85);
 		} else if (cascade_intake_active) {
-			lift_to(cascade_intake_deg, 45);
+			lift_to(cascade_intake_deg, 90);
 		} else {
+			lift_release();
 			cascade.move(0);
 		}
 
@@ -154,11 +170,17 @@ void opcontrol() {
 			claw_spin.move(0);
 		}
 
-		// Claw turn: B cycles vertical -> highest -> lifted -> horizontal -> vertical.
-		// With the intake running (R1) it skips the lifted angle: highest -> horizontal.
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
-			claw_turn_state = (claw_turn_state + 1) % 4;
-			if (intake_running && claw_turn_state == 2) claw_turn_state = 3;
+		// Claw turn: B = grab the cup + pin off the ground, X = score.
+		// B: 1st press -> highest angle (over the cup), 2nd press -> down to the small
+		//    lifted angle to grab it. Pressing again goes back to highest.
+		// X: 1st press -> horizontal (90 deg) to score, 2nd press -> all the way down.
+		// Each button looks at where the claw is now, so B then X works straight through.
+		bool claw_b = master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
+		bool claw_x = master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X);
+		if (claw_b || claw_x) {
+			claw_hold_here = false;
+			if (claw_b) claw_turn_state = (claw_turn_state == 1) ? 2 : 1;
+			else claw_turn_state = (claw_turn_state == 3) ? 0 : 3;
 			if (claw_turn_state == 1) {
 				claw_turn_target = CLAW_TURN_HIGHEST_DEG;
 			} 
@@ -174,9 +196,32 @@ void opcontrol() {
 			claw_turn_horizontal = (claw_turn_state != 0);  // keep shared flag in sync with auton
 		}
 
+		// Claw down (state 0): cascade up (R1) -> intake tilt, otherwise the boot spot.
+		// Goes by the lift height, not R1, so the 2nd R1 press doesn't lift the claw;
+		// it only comes back up once the cascade is lowered.
+		double claw_cmd = claw_turn_target;
+		if (claw_turn_state == 0 && !claw_hold_here) {
+			bool intake_up = cascade_intake_active || lift_pos() >= CLAW_CLEAR_CASCADE_DEG;
+			claw_cmd = intake_up ? CLAW_TURN_INTAKE_DEG : CLAW_TURN_VERTICAL_DEG;
+		}
+		if (claw_cmd != claw_last_cmd) {
+			claw_last_cmd = claw_cmd;
+			claw_cmd_ms = pros::millis();
+			claw_resting = false;
+		}
+		// Going down, the claw can land on a hard stop before its target and the motor
+		// keeps pushing into it (the sharp whine). Once it has stopped moving, just
+		// hold where it is.
+		if (claw_turn_state == 0 && !claw_resting && pros::millis() - claw_cmd_ms > 300 &&
+		    std::fabs(claw_turn.get_actual_velocity()) < 5.0) {
+			claw_resting = true;
+		}
+
 		// Re-issue every loop so the motor's position PID keeps fighting gravity
-		int velocity = claw_turn_horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
-		claw_turn.move_absolute(claw_turn_target, velocity);
+		int velocity = (claw_turn_horizontal || (claw_turn_state == 0 && claw_cmd == CLAW_TURN_INTAKE_DEG))
+			? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;   // intake tilt is full speed
+		if (claw_resting) claw_turn.brake();   // HOLD brake: holds here, no pushing
+		else claw_turn.move_absolute(claw_cmd, velocity);
 		pros::delay(20);
 	}
 }

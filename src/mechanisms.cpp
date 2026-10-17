@@ -1,12 +1,12 @@
 #include "mechanisms.h"
 #include "estop.h"
 #include <cmath>
+#include <algorithm>
 
 void mech_init() {
 	cascade.tare_position_all();   // _all: plain tare_position() only zeroes the first motor
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // _all, or only the first motor gets it
-	// Boot position = 0 = vertical. CLAW_TURN_VERTICAL_DEG is 0 to match, so nothing
-	// moves when driver control starts.
+	// Boot position = 0 = down (the claw boots slanted; that spot is "down").
 	claw_turn.tare_position();
 	claw_turn_horizontal = false;
 	intake_motor.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
@@ -17,13 +17,48 @@ void intake_set(int voltage) {
 	intake_motor.move(voltage);
 }
 
+// The port 20 cascade motor slips, so its own count drifts away from the real lift
+// height. Port 19's count is the real lift position. The lift is moved by a simple
+// controller that reads ONLY port 19 and sends the same power to both motors (aiming
+// each motor by its own count made them fight each other).
+double lift_pos() {
+	return cascade.get_position(1);   // index 1 = port 19 in {-20, 19}
+}
+
+namespace {
+volatile bool lift_active = false;
+volatile double lift_goal_deg = 0.0;
+volatile int lift_max_volt = 127;
+
+void lift_task_fn() {
+	while (true) {
+		if (lift_active) {
+			double err = lift_goal_deg - lift_pos();
+			if (std::fabs(err) < 6.0) cascade.move(0);   // close enough: brake mode holds it
+			else {
+				int max_v = lift_max_volt;
+				cascade.move(std::clamp((int)(1.0 * err), -max_v, max_v));
+			}
+		}
+		pros::delay(10);
+	}
+}
+} // namespace
+
 void lift_to(double deg, int velocity) {
-	cascade.move_absolute(deg, velocity);
+	static pros::Task lift_task(lift_task_fn);   // started the first time the lift is aimed
+	lift_max_volt = std::clamp((int)(velocity * 127 / 200), 20, 127);   // 200 rpm = full power
+	lift_goal_deg = deg;
+	lift_active = true;
+}
+
+void lift_release() {
+	lift_active = false;   // stop aiming; whoever calls this moves the cascade by hand
 }
 
 bool lift_wait(double deg, int timeout_ms, double tol_deg) {
 	uint32_t start = pros::millis();
-	while (std::fabs(cascade.get_position() - deg) > tol_deg) {
+	while (std::fabs(lift_pos() - deg) > tol_deg) {
 		if (pros::millis() - start > (uint32_t)timeout_ms || estop_triggered()) return false;
 		pros::delay(10);
 	}
@@ -62,6 +97,7 @@ bool claw_lift_off(int timeout_ms, double tol_deg) {
 }
 
 void mech_stop_all() {
+	lift_release();
 	intake_motor.move(0);
 	claw_spin.move(0);
 	cascade.move(0);

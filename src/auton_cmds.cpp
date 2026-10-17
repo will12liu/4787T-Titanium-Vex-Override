@@ -91,6 +91,15 @@ bool odom_ok(const char* name) {
 	auton_status("NO ODOM: skipped");
 	return false;
 }
+
+// Axis lock: a move along y keeps x where it is, and a move along x keeps y where it is,
+// so the robot drives dead straight instead of angling toward a slightly-off other axis.
+// The bigger of the two distances decides which axis the move is on.
+void axis_lock(float& x, float& y) {
+	lemlib::Pose p = chassis.getPose();
+	if (std::fabs(y - p.y) >= std::fabs(x - p.x)) x = p.x;
+	else y = p.y;
+}
 } // namespace
 
 void set_pose(float x, float y, float heading) {
@@ -98,13 +107,17 @@ void set_pose(float x, float y, float heading) {
 }
 
 void drive_to(float x, float y, int speed, int timeout_ms) {
-	if (odom_ok("drive_to"))
+	if (odom_ok("drive_to")) {
+		axis_lock(x, y);
 		chassis.moveToPoint(x, y, timeout_ms, {.forwards = true, .maxSpeed = (float)clamp_speed(speed)}, false);
+	}
 }
 
 void back_to(float x, float y, int speed, int timeout_ms) {
-	if (odom_ok("back_to"))
+	if (odom_ok("back_to")) {
+		axis_lock(x, y);
 		chassis.moveToPoint(x, y, timeout_ms, {.forwards = false, .maxSpeed = (float)clamp_speed(speed)}, false);
+	}
 }
 
 void face(float x, float y, int speed, int timeout_ms) {
@@ -135,7 +148,6 @@ void lift_wait(int timeout_ms) { auton_status("lift_wait"); if (!stopped()) ::li
 
 // ================================== claw ==========================================
 void claw_in() { auton_status("claw_in"); claw_step = 0; claw_flip(false); claw_flip_wait(2000); }
-void claw_out() { auton_status("claw_out"); claw_step = 3; claw_flip(true); claw_flip_wait(200); }
 void claw_up() { auton_status("claw_up"); claw_step = 2; if (!stopped()) claw_lift_off(); }
 
 namespace {
@@ -155,6 +167,9 @@ void claw_go_to_step(int step) {
 	}
 }
 } // namespace
+
+// Same as X's 1st press in driver control: go to horizontal (90) and wait until there.
+void claw_out() { auton_status("claw_out"); claw_go_to_step(3); }
 
 void claw_next() {
 	auton_status("claw_next");
@@ -178,3 +193,11 @@ void claw_drop(int speed, int ms) {
 // ============================= intake / claw spin =================================
 void intake(int speed) { intake_set(speed); }
 void spin_claw(int speed) { claw_spin.move(speed); }
+void lift_secs(int ms, bool up)
+{
+	auton_status("lift_secs");
+	lift_release();                      // stop any lift_goal()/lift_down() target first
+	cascade.move(up ? 127 : -85);        // same speeds as L1 / L2
+	wait(ms);                            // returns early on E-STOP
+	cascade.move(0);                     // brake mode holds it (CASCADE_BRAKE_MODE)
+}
