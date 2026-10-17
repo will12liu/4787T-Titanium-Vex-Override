@@ -148,7 +148,8 @@ void lift_wait(int timeout_ms) { auton_status("lift_wait"); if (!stopped()) ::li
 
 // ================================== claw ==========================================
 void claw_in() { auton_status("claw_in"); claw_step = 0; claw_flip(false); claw_flip_wait(2000); }
-void claw_up() { auton_status("claw_up"); claw_step = 2; if (!stopped()) claw_lift_off(); }
+void claw_up() { auton_status("claw_up"); claw_step = 1; if (!stopped()) claw_lift_off(); }
+void claw_down_45() { auton_status("claw_down_45"); claw_step = 2; if (!stopped()) claw_lift_off(); }
 
 namespace {
 // Move the claw to the given B-cycle step and wait until it is there.

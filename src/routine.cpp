@@ -1,6 +1,7 @@
 
 #include "main.h"
 #include "auton_cmds.h"
+#include <cmath>
 
 void run_routine() {
 	// 1. Hit the Toggle twice 
@@ -21,9 +22,11 @@ void run_routine() {
 	claw_up();
 	lift_secs(300,true); 
 	                           // horizontal -> slanted, waits until it gets there
-// 3. go to (21.9, -32.6) facing -50.3: every move is straight along one axis
-	drive_to(mirror(13.9), -17.4, 100);    // 1) pull away from the goal (front first) to give room to turn
-	back_to(mirror(13.9), -32.6, 100);     // 2) straight along y to the final y
-	back_to(mirror(21.9), -32.6, 100);     // 3) straight along x to the final x
-	face_heading(mirror(-50.3), 100);      // 4) turn to the final heading
+// 3. pull away, turn, then back down a slanted line to (18.4, -29.9)
+	drive_to(mirror(5.4), -17.4, 100);              // 1) pull away from the goal to x = 5.4
+	lift_secs(300,false);
+	face_heading(mirror(309.3), 100);               // 2) turn to 309.3 (= -50.7)
+	back_to_pose(mirror(18.4), -29.9, mirror(309.3), 100);   // 3) back down the line to the spot
+	spin_claw(100);
+	claw_down_45();
 }

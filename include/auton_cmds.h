@@ -12,6 +12,7 @@
 // pushing into things. Negative speed = backwards. Uses the IMU to keep facing
 // the way the robot faced when it started.
 void drive_time(int speed, int ms);
+void claw_down_45();
 
 // ---- LemLib (odometry): go to a spot on the field -------------------------------
 // The robot always knows where it is as (x, y, heading), in inches and degrees.
