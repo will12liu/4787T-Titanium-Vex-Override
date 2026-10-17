@@ -21,7 +21,7 @@ void run_routine() {
 	claw_drop();    
 	wait(50);                       // claw spin (A button) to drop the pin
 	claw_up();
-	lift_secs(300,true); .
+	lift_secs(300,true);
 	const float FACE_H = 316.3f;
     // y the move must reach (-39.9 overshot by ~14" along the line)
 	const float back_dir = (FACE_H + 180.0f) * 3.14159265f / 180.0f;

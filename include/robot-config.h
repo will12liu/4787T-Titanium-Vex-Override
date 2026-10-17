@@ -25,6 +25,7 @@ extern pros::Motor claw_spin;
 extern pros::adi::Pneumatics aux_piston_a;
 extern pros::adi::Pneumatics aux_piston_b;
 extern pros::Rotation horiz_odom;
+extern pros::Rotation lift_rot;   // on the middle cascade axis: the real lift height
 
 // PLACEHOLDER PORT — update once build team confirms IMU mounting/wiring
 extern pros::Imu imu;

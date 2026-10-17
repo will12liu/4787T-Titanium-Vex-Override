@@ -1,6 +1,7 @@
 #include "tuning.h"
 #include "main.h"
 #include "robot-config.h"
+#include "mechanisms.h"
 #include "auton.h"
 #include "estop.h"
 #include <cmath>
@@ -102,10 +103,11 @@ void draw_readouts() {
 	                    editing_lat ? "> " : "  ", lat.kP, lat.kI, lat.kD);
 	pros::screen::print(pros::E_TEXT_MEDIUM, 4, 4 * LINE_H, "%s", result1);
 	// Both cascade motors (port 20 / port 19): they should read the same while the lift moves.
-	std::vector<double> lift_pos = cascade.get_position_all();
-	pros::screen::print(pros::E_TEXT_SMALL, 4, 5 * LINE_H, "%s   bat %.0f%%  lift %.0f / %.0f",
+	std::vector<double> motor_pos = cascade.get_position_all();
+	pros::screen::print(pros::E_TEXT_SMALL, 4, 5 * LINE_H, "%s   bat %.0f%%  lift %.0f / %.0f  rot %.0f",
 	                    result2, pros::battery::get_capacity(),
-	                    lift_pos.size() > 0 ? lift_pos[0] : 0.0, lift_pos.size() > 1 ? lift_pos[1] : 0.0);
+	                    motor_pos.size() > 0 ? motor_pos[0] : 0.0, motor_pos.size() > 1 ? motor_pos[1] : 0.0,
+	                    ::lift_pos());
 }
 void countdown(const char* name) {
 	snprintf(result1, sizeof(result1), "%s in 1 s, hands off", name);

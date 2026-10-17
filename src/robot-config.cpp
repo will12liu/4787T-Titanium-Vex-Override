@@ -16,6 +16,9 @@ pros::MotorGroup cascade ({-20,19}, pros::MotorGears::green);
 
 pros::Motor claw_turn(-17, pros::MotorGears::green);
 pros::Motor claw_spin(15, pros::MotorGears::green);
+// Lift rotation sensor on the middle cascade axis (port 14).
+// Negative port = reversed; flip the sign if the number goes DOWN when the lift goes up.
+pros::Rotation lift_rot(14);
 pros::Rotation horiz_odom(-6);   // horizontal odom pod: port 6 (Brain port check), reversed (x went down sliding right). Offset measured: 2" behind the turning center (-2)
 
 
