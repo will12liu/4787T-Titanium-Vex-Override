@@ -114,11 +114,12 @@ void opcontrol() {
 			claw_spin_out = (r1_state != 0);
 			claw_spin_in = false;
 			cascade_intake_active = (r1_state == 1);
-			if (r1_state == 1) {   // intake on: claw goes down (tilts to ~10 deg once the cascade is up)
+			/*if (r1_state == 1) {   // intake on: claw goes down (tilts to ~10 deg once the cascade is up)
 				claw_turn_state = 0;
 				claw_hold_here = false;
 				claw_turn_horizontal = false;
 			}
+				*/
 		}
 		// R2 toggles both motors opposite their R1 directions; press again to stop.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) && !estop_combo) {
@@ -144,7 +145,7 @@ void opcontrol() {
 			lift_release();
 			cascade.move(-85);
 		} else if (cascade_intake_active) {
-			lift_to(cascade_intake_deg, 90);
+			lift_to(cascade_intake_deg, 200);
 		} else {
 			lift_release();
 			cascade.move(0);

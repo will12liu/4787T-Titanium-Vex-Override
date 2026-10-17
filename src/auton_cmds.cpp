@@ -120,10 +120,27 @@ void back_to(float x, float y, int speed, int timeout_ms) {
 	}
 }
 
-// Like back_to but no axis lock: drives a straight slanted line (turns to aim first if needed).
-void back_straight(float x, float y, int speed, int timeout_ms) {
-	if (odom_ok("back_straight"))
-		chassis.moveToPoint(x, y, timeout_ms, {.forwards = false, .maxSpeed = (float)clamp_speed(speed)}, false);
+// Back up in a dead-straight line for `inches`, holding the heading the robot has right now
+// (IMU steering, like drive_time) and measuring the distance with odometry. Face the way you
+// want to go first (face_heading), then call this. No path planning, so it can't curve.
+void back_dist(float inches, int speed, int timeout_ms) {
+	if (!odom_ok("back_dist")) return;
+	lemlib::Pose start = chassis.getPose();
+	double hold = imu.get_rotation();
+	uint32_t end = pros::millis() + timeout_ms;
+	while (pros::millis() < end && !stopped()) {
+		lemlib::Pose p = chassis.getPose();
+		double done = std::hypot(p.x - start.x, p.y - start.y);
+		double left_in = inches - done;
+		if (left_in <= 0.5) break;
+		int v = clamp_speed(speed);
+		if (left_in < 6.0) v = std::max(35, (int)(v * left_in / 6.0));   // ease in over the last 6"
+		int turn_part = (int)std::clamp(STRAIGHT_KP * (hold - imu.get_rotation()), -40.0, 40.0);
+		left_motors.move(std::clamp(-v + turn_part, -127, 127));
+		right_motors.move(std::clamp(-v - turn_part, -127, 127));
+		pros::delay(10);
+	}
+	stop_drive();
 }
 
 void face(float x, float y, int speed, int timeout_ms) {
@@ -154,7 +171,6 @@ void lift_wait(int timeout_ms) { auton_status("lift_wait"); if (!stopped()) ::li
 
 // ================================== claw ==========================================
 void claw_in() { auton_status("claw_in"); claw_step = 0; claw_flip(false); claw_flip_wait(2000); }
-void claw_up() { auton_status("claw_up"); claw_step = 1; if (!stopped()) claw_lift_off(); }
 void claw_down_45() { auton_status("claw_down_45"); claw_step = 2; if (!stopped()) claw_lift_off(); }
 
 namespace {
@@ -174,6 +190,9 @@ void claw_go_to_step(int step) {
 	}
 }
 } // namespace
+
+// B's 1st press: go to the highest angle and wait until there.
+void claw_up() { auton_status("claw_up"); claw_go_to_step(1); }
 
 // Same as X's 1st press in driver control: go to horizontal (90) and wait until there.
 void claw_out() { auton_status("claw_out"); claw_go_to_step(3); }

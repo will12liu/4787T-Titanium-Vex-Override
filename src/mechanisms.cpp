@@ -34,10 +34,16 @@ void lift_task_fn() {
 	while (true) {
 		if (lift_active) {
 			double err = lift_goal_deg - lift_pos();
-			if (std::fabs(err) < 6.0) cascade.move(0);   // close enough: brake mode holds it
+			if (std::fabs(err) < 8.0) cascade.move(0);   // close enough: brake mode holds it
 			else {
+				// Plain 1 volt per degree ran out of push a few dozen degrees short (the lift
+				// stalled against gravity and friction), so use a bigger gain plus a minimum
+				// push: more going up (against gravity), less coming down.
 				int max_v = lift_max_volt;
-				cascade.move(std::clamp((int)(1.0 * err), -max_v, max_v));
+				int v = (int)(3.0 * err);
+				int min_v = err > 0 ? 40 : 15;
+				if (std::abs(v) < min_v) v = err > 0 ? min_v : -min_v;
+				cascade.move(std::clamp(v, -max_v, max_v));
 			}
 		}
 		pros::delay(10);
