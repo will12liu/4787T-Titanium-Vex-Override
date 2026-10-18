@@ -55,6 +55,25 @@ double lift_pos() {
 	return c / 100.0 * LIFT_ROT_TO_LIFT;
 }
 
+void cascade_move(int voltage) {
+	if (voltage == 0 || lift_rot.get_position() == PROS_ERR) {
+		cascade.move(voltage);
+		return;
+	}
+	double pos = lift_pos();
+	double s = LIFT_LIMIT_TOP_DEG > LIFT_LIMIT_BOTTOM_DEG ? 1.0 : -1.0;   // direction of "up" in lift_pos()
+	double room = voltage > 0 ? (LIFT_LIMIT_TOP_DEG - pos) * s : (pos - LIFT_LIMIT_BOTTOM_DEG) * s;
+	if (room <= 0) {
+		cascade.move(0);   // at or past the end: brake mode holds it there
+		return;
+	}
+	if (room < LIFT_LIMIT_SLOW_DEG) {   // ease off so it doesn't coast past the end
+		int cap = std::max(LIFT_LIMIT_MIN_VOLT, (int)(127.0 * room / LIFT_LIMIT_SLOW_DEG));
+		voltage = std::clamp(voltage, -cap, cap);
+	}
+	cascade.move(voltage);
+}
+
 bool lift_at(double deg, double tol_deg) {
 	return std::fabs(lift_pos() - deg) <= tol_deg;
 }
@@ -74,7 +93,7 @@ void lift_task_fn() {
 			// slipped past the re-correct band, so a small sag doesn't make it buzz.
 			if (a < LIFT_HOLD_BAND_DEG) holding = true;
 			else if (a > LIFT_RECORRECT_DEG) holding = false;
-			if (holding) cascade.move(0);
+			if (holding) cascade_move(0);
 			else {
 				int max_v = lift_max_volt;
 				int v = (int)(3.0 * err);
@@ -83,7 +102,7 @@ void lift_task_fn() {
 				} else {         // over: come back down gently
 					v = std::clamp(std::min(v, -LIFT_OVER_MIN_VOLT), -std::min(max_v, LIFT_OVER_MAX_VOLT), -LIFT_OVER_MIN_VOLT);
 				}
-				cascade.move(v);
+				cascade_move(v);
 			}
 		}
 		pros::delay(10);

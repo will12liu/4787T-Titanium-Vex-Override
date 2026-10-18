@@ -102,11 +102,11 @@ void opcontrol() {
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
 			cascade_intake_active = false;
 			lift_release();
-			cascade.move(127);
+			cascade_move(127);
 		} else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
 			cascade_intake_active = false;
 			lift_release();
-			cascade.move(-85);
+			cascade_move(-85);
 		} else if (cascade_intake_active) {
 			lift_to(cascade_intake_deg, 200);
 		} else {
