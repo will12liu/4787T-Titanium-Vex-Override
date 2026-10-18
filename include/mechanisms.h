@@ -60,6 +60,14 @@ constexpr int LIFT_UNDER_MIN_VOLT = 40;        // min push going up (against gra
 constexpr int LIFT_OVER_MIN_VOLT = 15;         // min push going down
 constexpr int LIFT_OVER_MAX_VOLT = 60;         // cap going down so it can't slam / bounce back up
 constexpr double LIFT_DOWN_DEG = 0.0;
+// Hard travel limits in lift_pos() units (the "rot" number on the tuning screen). Measured:
+// lowest = 10, highest = -1444, so on this sensor the number goes DOWN as the lift goes up.
+// cascade_move() refuses to drive past either end and slows down inside LIFT_LIMIT_SLOW_DEG of it.
+// Zero is taken at boot (mech_init), so the lift must start fully down.
+constexpr double LIFT_LIMIT_BOTTOM_DEG = 10.0;
+constexpr double LIFT_LIMIT_TOP_DEG = -1444.0;
+constexpr double LIFT_LIMIT_SLOW_DEG = 80.0;   // start slowing this far from an end
+constexpr int LIFT_LIMIT_MIN_VOLT = 30;        // slowest the taper goes before the stop
 // Second number is the old guess, used until LIFT_MAX_DEG is measured.
 constexpr double LIFT_ALLIANCE_GOAL_DEG = lift_deg_for_height(3.25 + LIFT_CLEARANCE_IN, 400.0);
 constexpr double LIFT_SHORT_GOAL_DEG = lift_deg_for_height(5.77 + LIFT_CLEARANCE_IN, 700.0);
@@ -68,6 +76,11 @@ constexpr int LIFT_VELOCITY = 200;
 
 // Call once from initialize() with the lift fully down and the claw vertical.
 void mech_init();
+
+// Drive the cascade, voltage [-127, 127], + = up. Respects the travel limits: it won't push past
+// either end and eases off near them. Every cascade command goes through this, never cascade.move().
+// If the rotation sensor is unplugged it can't tell where the lift is, so it doesn't limit.
+void cascade_move(int voltage);
 
 // Lift. lift_to() is non-blocking; lift_wait() blocks until within tol or timeout.
 // lift_pos() = lift position from the cascade rotation sensor (motor counts drift).

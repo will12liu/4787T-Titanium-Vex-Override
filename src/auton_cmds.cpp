@@ -180,7 +180,10 @@ void lift_secs(int ms, bool up)
 {
 	auton_status("lift_secs");
 	lift_release();                      // stop any lift_goal()/lift_down() target first
-	cascade.move(up ? 127 : -85);        // same speeds as L1 / L2
-	wait(ms);                            // returns early on E-STOP
+	uint32_t end = pros::millis() + ms;  // re-issued every loop so the travel limits keep applying
+	while (pros::millis() < end && !stopped()) {
+		cascade_move(up ? 127 : -85);    // same speeds as L1 / L2
+		pros::delay(10);
+	}
 	cascade.move(0);                     // brake mode holds it (CASCADE_BRAKE_MODE)
 }
