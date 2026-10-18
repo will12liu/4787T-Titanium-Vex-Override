@@ -13,14 +13,14 @@ void mech_init() {
 
 void claw_vision_init() {
 	// PLACEHOLDER numbers: replace with the output of the Vision Utility for the pin.
-	vision_signature_s_t sig = pros::Vision::signature_from_utility(
+	pros::vision_signature_s_t sig = pros::Vision::signature_from_utility(
 		CLAW_VISION_SIG_ID, 8973, 11143, 10058, -2119, -1053, -1586, 5.4, 0);
 	claw_vision.set_signature(CLAW_VISION_SIG_ID, &sig);
 	claw_vision.set_zero_point(pros::E_VISION_ZERO_TOPLEFT);
 }
 
 bool claw_vision_sees_pin() {
-	vision_object_s_t obj = claw_vision.get_by_size(0);   // biggest object
+	pros::vision_object_s_t obj = claw_vision.get_by_size(0);   // biggest object
 	if (obj.signature == VISION_OBJECT_ERR_SIG) return false;   // nothing seen, or sensor unplugged
 	return obj.width >= CLAW_VISION_MIN_WIDTH && obj.height >= CLAW_VISION_MIN_HEIGHT;
 }
