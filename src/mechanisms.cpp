@@ -11,30 +11,26 @@ void mech_init() {
 	claw_spin.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
 }
 
-void claw_vision_init() {
-	// PLACEHOLDER numbers: replace with the output of the Vision Utility for the pin.
-	pros::vision_signature_s_t sig = pros::Vision::signature_from_utility(
-		CLAW_VISION_SIG_ID, 8973, 11143, 10058, -2119, -1053, -1586, 5.4, 0);
-	claw_vision.set_signature(CLAW_VISION_SIG_ID, &sig);
-	claw_vision.set_zero_point(pros::E_VISION_ZERO_TOPLEFT);
+void claw_optical_init() {
+	claw_optical.set_led_pwm(100);   // proximity needs the LED on
+	claw_optical.disable_gesture();
 }
 
-bool claw_vision_sees_pin() {
-	pros::vision_object_s_t obj = claw_vision.get_by_size(0);   // biggest object
-	if (obj.signature == VISION_OBJECT_ERR_SIG) return false;   // nothing seen, or sensor unplugged
-	return obj.width >= CLAW_VISION_MIN_WIDTH && obj.height >= CLAW_VISION_MIN_HEIGHT;
+bool claw_sees_pin() {
+	int32_t p = claw_optical.get_proximity();
+	return p != PROS_ERR && p >= CLAW_OPTICAL_PROX_MIN;   // PROS_ERR = sensor unplugged
 }
 
 bool claw_pin_just_grabbed() {
 	static uint32_t seen_since = 0;
 	static bool was_in = false;
-	if (!claw_vision_sees_pin()) {
+	if (!claw_sees_pin()) {
 		seen_since = 0;
 		was_in = false;
 		return false;
 	}
 	if (seen_since == 0) seen_since = pros::millis();
-	bool in = pros::millis() - seen_since >= (uint32_t)CLAW_VISION_CONFIRM_MS;
+	bool in = pros::millis() - seen_since >= (uint32_t)CLAW_OPTICAL_CONFIRM_MS;
 	bool rising = in && !was_in;
 	was_in = in;
 	return rising;

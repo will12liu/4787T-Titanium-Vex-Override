@@ -13,19 +13,16 @@ constexpr double cascade_intake_deg = 350.0;  // cascade motor position R1 lifts
 constexpr int CLAW_DROP_SPEED = 127;
 constexpr int CLAW_DROP_MS = 700;
 
-// ---- Claw vision sensor (detects a pin inside the claw, stops the inward spin) ----
-// Make the signature in the VEX Vision Utility with the pin in the claw, then paste the numbers
-// into claw_vision_init() in mechanisms.cpp. Size thresholds are in sensor pixels (316 x 212 frame):
-// the object counts as "in the claw" once it is at least this big. Tune with a pin held in the claw.
-constexpr int CLAW_VISION_SIG_ID = 1;
-constexpr int CLAW_VISION_MIN_WIDTH = 120;
-constexpr int CLAW_VISION_MIN_HEIGHT = 80;
-constexpr int CLAW_VISION_CONFIRM_MS = 80;   // must see it this long in a row (ignores flicker)
+// ---- Claw optical sensor (detects a pin inside the claw, stops the inward spin) ----
+// Proximity reads 0 (nothing) to 255 (touching). The pin counts as "in the claw" once the
+// reading is at least this. Hold a pin in the claw and read the value to tune it.
+constexpr int CLAW_OPTICAL_PROX_MIN = 150;
+constexpr int CLAW_OPTICAL_CONFIRM_MS = 80;   // must see it this long in a row (ignores flicker)
 
 // Call once from initialize().
-void claw_vision_init();
-// Raw check, true while a big enough object fills the claw view.
-bool claw_vision_sees_pin();
+void claw_optical_init();
+// Raw check, true while something is close enough to the sensor.
+bool claw_sees_pin();
 // Debounced. Call every loop. Returns true once, on the loop the pin newly counts as in the claw
 // (so the driver can spin again with the pin already inside without it re-triggering).
 bool claw_pin_just_grabbed();

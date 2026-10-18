@@ -15,8 +15,8 @@ pros::MotorGroup right_motors({-2,-3}, pros::MotorGears::blue);
 pros::MotorGroup cascade ({-20,19}, pros::MotorGears::green);
 
 pros::Motor claw_spin(15, pros::MotorGears::green);
-// Vision sensor looking into the claw's grab area (port 17, the old flip motor port).
-pros::Vision claw_vision(CLAW_VISION_PORT);
+// Optical sensor looking into the claw's grab area (port 17, the old flip motor port).
+pros::Optical claw_optical(CLAW_OPTICAL_PORT);
 // Lift rotation sensor on the middle cascade axis (port 14).
 // Negative port = reversed; flip the sign if the number goes DOWN when the lift goes up.
 pros::Rotation lift_rot(14);
