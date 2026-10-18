@@ -22,6 +22,8 @@ extern pros::MotorGroup cascade;
 
 extern pros::Motor claw_turn;
 extern pros::Motor claw_spin;
+constexpr int CLAW_VISION_PORT = 10;   // PLACEHOLDER: free smart port, update once wired
+extern pros::Vision claw_vision;
 extern pros::adi::Pneumatics aux_piston_a;
 extern pros::adi::Pneumatics aux_piston_b;
 extern pros::Rotation horiz_odom;

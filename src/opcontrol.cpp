@@ -139,6 +139,10 @@ void opcontrol() {
 			cascade.move(0);
 		}
 
+		// Vision sensor sees a pin inside the claw: stop spinning in. Checked every loop so the
+		// debounce keeps running; only the new-grab edge cancels, so R2 again spins with it inside.
+		if (claw_pin_just_grabbed() && claw_spin_in) claw_spin_in = false;
+
 		if (claw_spin_in) {
 			claw_spin.move(60);
 		} else if (claw_spin_out) {

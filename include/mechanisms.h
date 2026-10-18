@@ -28,6 +28,26 @@ constexpr int CLAW_DROP_MS = 700;
 constexpr int CLAW_TURN_VELOCITY = 200;
 constexpr int CLAW_TURN_DOWN_VELOCITY = 100;
 
+// ---- Claw vision sensor (detects a pin inside the claw, stops the inward spin) ----
+// Make the signature in the VEX Vision Utility with the pin in the claw, then paste the numbers
+// into CLAW_VISION_SIG in mechanisms.cpp. Size thresholds are in sensor pixels (316 x 212 frame):
+// the object counts as "in the claw" once it is at least this big. Read the live values on the
+// controller/brain with claw_vision_debug() and tune.
+constexpr int CLAW_VISION_SIG_ID = 1;
+constexpr int CLAW_VISION_MIN_WIDTH = 120;
+constexpr int CLAW_VISION_MIN_HEIGHT = 80;
+constexpr int CLAW_VISION_CONFIRM_MS = 80;   // must see it this long in a row (ignores flicker)
+
+// Call once from initialize().
+void claw_vision_init();
+// Raw check, true while a big enough object fills the claw view.
+bool claw_vision_sees_pin();
+// Debounced. Call every loop. Returns true once, on the loop the pin newly counts as in the claw
+// (so the driver can spin again with the pin already inside without it re-triggering).
+bool claw_pin_just_grabbed();
+// Auton: spin the claw at speed until a pin is detected or timeout. Returns true if one was grabbed.
+bool claw_spin_until_pin(int speed, int timeout_ms);
+
 // ---- Lift heights, cascade motor degrees from the fully-lowered position ----
 // Heights are of the claw scoring point (where the held pin's bottom is) above
 // the floor, in inches. Degrees are worked out by straight-line interpolation

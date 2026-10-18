@@ -27,6 +27,7 @@ void build_expected(char* expected) {
 	mark(claw_spin.get_port(), 'M');
 	mark(intake_motor.get_port(), 'M');
 	mark(imu.get_port(), 'I');
+	mark(claw_vision.get_port(), 'V');
 	mark(lift_rot.get_port(), 'R');
 #if USE_TRACKING_WHEELS
 #if USE_VERTICAL_POD
@@ -62,6 +63,7 @@ void initialize() {
 					case pros::DeviceType::imu: seen[i] = 'I'; break;
 					case pros::DeviceType::rotation: seen[i] = 'R'; break;
 					case pros::DeviceType::distance: seen[i] = 'D'; break;
+					case pros::DeviceType::vision: seen[i] = 'V'; break;
 					case pros::DeviceType::none: seen[i] = '-'; break;
 					default: seen[i] = '?'; break;
 				}
@@ -75,6 +77,7 @@ void initialize() {
 	});
 
 	mech_init();             // tare lift + claw flip, set brake modes. Lift must be fully down.
+	claw_vision_init();      // pin signature for the claw vision sensor
 	auton_selector_start();  // LEFT / RIGHT buttons on the Brain + controller D-pad
 	auton_init();            // find IMU, calibrate LemLib chassis (blocks ~2-3 s)
 	tuning_start();          // TUNE button on the Brain: PID + sensor tuning
