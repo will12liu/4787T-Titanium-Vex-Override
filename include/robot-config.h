@@ -38,7 +38,6 @@ extern lemlib::ControllerSettings lateral_controller;
 extern lemlib::ControllerSettings angular_controller;
 extern lemlib::OdomSensors sensors;
 extern lemlib::Chassis chassis;
-extern pros::Motor intake_motor;
 // Add drivetrain motors, IMU, other sensors here as the robot gets built
 #if USE_TRACKING_WHEELS
 #if USE_VERTICAL_POD

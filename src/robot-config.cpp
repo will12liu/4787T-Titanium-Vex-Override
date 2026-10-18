@@ -12,7 +12,7 @@
 // PLACEHOLDER PORTS — update once build team finalizes wiring
 pros::MotorGroup left_motors({1,4}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({-2,-3}, pros::MotorGears::blue);
-pros::MotorGroup cascade ({-20,19}, pros::MotorGears::green);
+pros::MotorGroup cascade ({-20,19,-18}, pros::MotorGears::green);
 
 pros::Motor claw_spin(15, pros::MotorGears::green);
 // Optical sensor looking into the claw's grab area (port 17, the old flip motor port).
@@ -28,7 +28,6 @@ pros::Rotation horiz_odom(-6);   // horizontal odom pod: port 6 (Brain port chec
 pros::adi::Pneumatics aux_piston_a('A', false);
 pros::adi::Pneumatics aux_piston_b('B', false);
 pros::Imu imu (8);
-pros::Motor intake_motor(18, pros::MotorGears::green);
 
 
 // Measured on the robot.

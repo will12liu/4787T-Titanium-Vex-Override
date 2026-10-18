@@ -174,8 +174,7 @@ void claw_drop(int speed, int ms) {
 	claw_spin.move(0);
 }
 
-// ============================= intake / claw spin =================================
-void intake(int speed) { intake_set(speed); }
+// ================================= claw spin ======================================
 void spin_claw(int speed) { claw_spin.move(speed); }
 void lift_secs(int ms, bool up)
 {

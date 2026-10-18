@@ -7,7 +7,6 @@ void mech_init() {
 	cascade.tare_position_all();   // _all: plain tare_position() only zeroes the first motor
 	lift_rot.reset_position();     // lift sensor zero = lift down at boot
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // _all, or only the first motor gets it
-	intake_motor.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
 	claw_spin.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
 }
 
@@ -46,10 +45,6 @@ bool claw_spin_until_pin(int speed, int timeout_ms) {
 	}
 	claw_spin.move(0);
 	return got;
-}
-
-void intake_set(int voltage) {
-	intake_motor.move(voltage);
 }
 
 // Lift height from the rotation sensor on the middle axis, so motor slip can't throw it off.
@@ -118,7 +113,6 @@ bool lift_wait(double deg, int timeout_ms, double tol_deg) {
 
 void mech_stop_all() {
 	lift_release();
-	intake_motor.move(0);
 	claw_spin.move(0);
 	cascade.move(0);
 }

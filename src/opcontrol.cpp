@@ -30,8 +30,6 @@ void opcontrol() {
 	double inverse_scale = 1.0;
 	const double INVERSE_RAMP_STEP = 0.25;   // per 20 ms loop: full flip takes ~160 ms
 	master.print(2, 0, "DRIVE: FWD");
-	bool intake_running = false;
-	bool intake_reversed = false;
 	bool claw_spin_in = false;
 	bool claw_spin_out = false;
 	int r1_state = 0;
@@ -46,8 +44,6 @@ void opcontrol() {
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
 			autonomous();
 			cascade_intake_active = false;
-			intake_running = false;
-			intake_reversed = false;
 			r1_state = 0;
 			claw_spin_in = false;
 			claw_spin_out = false;
@@ -97,7 +93,6 @@ void opcontrol() {
 			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
 		}
-		intake_motor.move(intake_reversed ? -127 : (intake_running ? 127 : 0));
 
 		// R1 moves to the intake height. Manual controls cancel that target.
 		if (estop_combo) {

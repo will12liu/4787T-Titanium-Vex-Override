@@ -63,8 +63,7 @@ void lift_wait(int timeout_ms = 1500);   // wait until the lift has reached its 
 // ms = how long. Leave the numbers out to use CLAW_DROP_SPEED / CLAW_DROP_MS in mechanisms.h.
 void claw_drop(int speed = 1000, int ms = 0);
 
-// ---- Intake / claw spin --------------------------------------------------------
-void intake(int speed);         // intake roller, 0 = stop, negative = reverse
+// ---- Claw spin ----------------------------------------------------------------
 void spin_claw(int speed);      // claw spin motor, 0 = stop, negative = reverse (stays on until you set 0)
 void lift_secs(int ms, bool up);  // run the cascade up (true, like L1) or down (false, like L2) for ms, then stop. Waits until done
 

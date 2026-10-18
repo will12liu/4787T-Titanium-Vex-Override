@@ -24,7 +24,6 @@ void build_expected(char* expected) {
 	for (auto p : right_motors.get_port_all()) mark(p, 'M');
 	for (auto p : cascade.get_port_all()) mark(p, 'M');
 	mark(claw_spin.get_port(), 'M');
-	mark(intake_motor.get_port(), 'M');
 	mark(imu.get_port(), 'I');
 	mark(claw_optical.get_port(), 'O');
 	mark(lift_rot.get_port(), 'R');

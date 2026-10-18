@@ -69,9 +69,6 @@ constexpr int LIFT_VELOCITY = 200;
 // Call once from initialize() with the lift fully down and the claw vertical.
 void mech_init();
 
-// Intake roller. voltage in [-127, 127], 0 stops.
-void intake_set(int voltage);
-
 // Lift. lift_to() is non-blocking; lift_wait() blocks until within tol or timeout.
 // lift_pos() = lift position from the cascade rotation sensor (motor counts drift).
 double lift_pos();
