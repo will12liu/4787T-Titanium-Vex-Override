@@ -91,8 +91,9 @@ void opcontrol() {
 			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
 		}
-		// R2 toggles claw spin IN; switching directions cancels spin OUT.
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) && !estop_combo) {
+		// R2 or A toggles the claw release spin; switching directions cancels the grab spin.
+		if ((master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) ||
+		     master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) && !estop_combo) {
 			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
 		}
