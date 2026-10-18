@@ -23,7 +23,7 @@
 void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	int inverse = 1;
+	int inverse = -1;
 	// The drive direction ramps between +1 and -1 instead of snapping, so hitting D-pad Up
 	// at full speed doesn't slam the motors from +127 to -127 in one loop (wheel spin,
 	// current spike, the robot stalls for a moment).
@@ -140,7 +140,7 @@ void opcontrol() {
 		}
 
 		if (claw_spin_in) {
-			claw_spin.move(60);
+			claw_spin.move(85);
 		} else if (claw_spin_out) {
 			claw_spin.move(-127);
 		} else {

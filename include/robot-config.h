@@ -7,6 +7,7 @@
 extern pros::MotorGroup right_motors;
 extern pros::MotorGroup left_motors;
 extern pros::MotorGroup cascade;
+extern pros::Vision vision_sensor;
 
 // Dedicated tracking wheel pods + distance sensor + claw rotation sensor.
 // Off until they are physically mounted and ports/offsets are confirmed.
