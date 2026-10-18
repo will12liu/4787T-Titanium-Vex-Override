@@ -20,12 +20,6 @@ pros::Motor claw_spin(15, pros::MotorGears::green);
 // Negative port = reversed; flip the sign if the number goes DOWN when the lift goes up.
 pros::Rotation lift_rot(14);
 pros::Rotation horiz_odom(-6);   // horizontal odom pod: port 6 (Brain port check), reversed (x went down sliding right). Offset measured: 2" behind the turning center (-2)
-
-
-// PLACEHOLDER PORT — update once build team confirms ADI wiring
-// PLACEHOLDER PORTS, update once wiring is confirmed
-pros::adi::Pneumatics aux_piston_a('A', false);
-pros::adi::Pneumatics aux_piston_b('B', false);
 pros::Imu imu (8);
 pros::Motor intake_motor(18, pros::MotorGears::green);
 
