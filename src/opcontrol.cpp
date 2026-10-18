@@ -107,27 +107,14 @@ void opcontrol() {
 		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) &&
 		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-		// Intake: R1 toggles the intake and the claw spin (A's function) together
+		// R1 toggles claw spin OUT; switching directions cancels spin IN.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
-			r1_state = (r1_state + 1) % 3;
-			intake_running = (r1_state == 1);
-			intake_reversed = false;
-			claw_spin_out = (r1_state != 0);
+			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
-			cascade_intake_active = (r1_state == 1);
-			/*if (r1_state == 1) {   // intake on: claw goes down (tilts to ~10 deg once the cascade is up)
-				claw_turn_state = 0;
-				claw_hold_here = false;
-				claw_turn_horizontal = false;
-			}
-				*/
 		}
-		// R2 toggles both motors opposite their R1 directions; press again to stop.
+		// R2 toggles claw spin IN; switching directions cancels spin OUT.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) && !estop_combo) {
-			intake_reversed = !intake_reversed;
-			intake_running = false;
-			r1_state = 0;   // next R1 press starts the intake again
-			claw_spin_in = false;
+			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
 		}
 		intake_motor.move(intake_reversed ? -127 : (intake_running ? 127 : 0));
@@ -158,14 +145,12 @@ void opcontrol() {
 			claw_spin_out = false;
 		}
 		// Claw spin: press Y once to spin OUT, press again to stop.
-		// (R1 above also starts claw spin out together with the intake.)
+		// R1 above uses the same OUT toggle.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
 			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
 		}
-		if (intake_reversed) {
-			claw_spin.move(127);
-		} else if (claw_spin_in) {
+		if (claw_spin_in) {
 			claw_spin.move(45);
 		} else if (claw_spin_out) {
 			claw_spin.move(-127);
