@@ -139,19 +139,8 @@ void opcontrol() {
 			cascade.move(0);
 		}
 
-		// Claw spin: press A once to spin IN, press again to stop.
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
-			claw_spin_in = !claw_spin_in;
-			claw_spin_out = false;
-		}
-		// Claw spin: press Y once to spin OUT, press again to stop.
-		// R1 above uses the same OUT toggle.
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
-			claw_spin_out = !claw_spin_out;
-			claw_spin_in = false;
-		}
 		if (claw_spin_in) {
-			claw_spin.move(45);
+			claw_spin.move(60);
 		} else if (claw_spin_out) {
 			claw_spin.move(-127);
 		} else {
