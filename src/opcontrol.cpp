@@ -51,6 +51,7 @@ void opcontrol() {
 	uint32_t claw_cmd_ms = pros::millis();
 	bool claw_resting = false;        // down and stopped moving: quit pushing
 	bool claw_intake_tilt = false;    // claw tilted for the intake; stays on until the cascade is well down
+	bool claw_tilt_blocked = false;   // R1 pressed off: claw goes back to vertical even with the cascade still up
 
 	while (true) {
 		// Auton test: D-pad DOWN runs autonomous() once. Only works with no
@@ -106,27 +107,14 @@ void opcontrol() {
 		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) &&
 		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-		// Intake: R1 toggles the intake and the claw spin (A's function) together
+		// R1 toggles claw spin OUT; switching directions cancels spin IN.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
-			r1_state = (r1_state + 1) % 3;
-			intake_running = (r1_state == 1);
-			intake_reversed = false;
-			claw_spin_out = (r1_state != 0);
+			claw_spin_out = !claw_spin_out;
 			claw_spin_in = false;
-			cascade_intake_active = (r1_state == 1);
-			/*if (r1_state == 1) {   // intake on: claw goes down (tilts to ~10 deg once the cascade is up)
-				claw_turn_state = 0;
-				claw_hold_here = false;
-				claw_turn_horizontal = false;
-			}
-				*/
 		}
-		// R2 toggles both motors opposite their R1 directions; press again to stop.
+		// R2 toggles claw spin IN; switching directions cancels spin OUT.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) && !estop_combo) {
-			intake_reversed = !intake_reversed;
-			intake_running = false;
-			r1_state = 0;   // next R1 press starts the intake again
-			claw_spin_in = false;
+			claw_spin_in = !claw_spin_in;
 			claw_spin_out = false;
 		}
 		intake_motor.move(intake_reversed ? -127 : (intake_running ? 127 : 0));
@@ -151,21 +139,8 @@ void opcontrol() {
 			cascade.move(0);
 		}
 
-		// Claw spin: press A once to spin IN, press again to stop.
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
-			claw_spin_in = !claw_spin_in;
-			claw_spin_out = false;
-		}
-		// Claw spin: press Y once to spin OUT, press again to stop.
-		// (R1 above also starts claw spin out together with the intake.)
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
-			claw_spin_out = !claw_spin_out;
-			claw_spin_in = false;
-		}
-		if (intake_reversed) {
-			claw_spin.move(127);
-		} else if (claw_spin_in) {
-			claw_spin.move(45);
+		if (claw_spin_in) {
+			claw_spin.move(60);
 		} else if (claw_spin_out) {
 			claw_spin.move(-127);
 		} else {
@@ -207,7 +182,9 @@ void opcontrol() {
 			// well below the intake height. Otherwise a cascade that sags a little after
 			// R1 drops under the line and the claw pops back up on its own.
 			double lp = lift_pos();
-			if (cascade_intake_active || lp >= CLAW_CLEAR_CASCADE_DEG) claw_intake_tilt = true;
+			if (lp < CLAW_CLEAR_CASCADE_DEG - 120.0) claw_tilt_blocked = false;   // cascade down: tilt allowed again
+			if (claw_tilt_blocked) claw_intake_tilt = false;
+			else if (cascade_intake_active || lp >= CLAW_CLEAR_CASCADE_DEG) claw_intake_tilt = true;
 			else if (lp < CLAW_CLEAR_CASCADE_DEG - 120.0) claw_intake_tilt = false;
 			claw_cmd = claw_intake_tilt ? CLAW_TURN_INTAKE_DEG : CLAW_TURN_VERTICAL_DEG;
 		}
