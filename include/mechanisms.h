@@ -16,7 +16,7 @@ constexpr int CLAW_DROP_MS = 700;
 // ---- Claw optical sensor (detects a pin inside the claw, stops the inward spin) ----
 // Proximity reads 0 (nothing) to 255 (touching). The pin counts as "in the claw" once the
 // reading is at least this. Hold a pin in the claw and read the value to tune it.
-constexpr int CLAW_OPTICAL_PROX_MIN = 150;
+constexpr int CLAW_OPTICAL_PROX_MIN = 110;   // measured: empty reads ~10, pin in claw reads ~210
 constexpr int CLAW_OPTICAL_CONFIRM_MS = 80;   // must see it this long in a row (ignores flicker)
 
 // Call once from initialize().
