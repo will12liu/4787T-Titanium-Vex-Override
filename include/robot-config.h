@@ -20,9 +20,8 @@ extern pros::MotorGroup cascade;
 #define USE_VERTICAL_POD 0
 #define USE_HORIZONTAL_POD 1
 
-extern pros::Motor claw_turn;
 extern pros::Motor claw_spin;
-constexpr int CLAW_VISION_PORT = 10;   // PLACEHOLDER: free smart port, update once wired
+constexpr int CLAW_VISION_PORT = 17;
 extern pros::Vision claw_vision;
 extern pros::adi::Pneumatics aux_piston_a;
 extern pros::adi::Pneumatics aux_piston_b;
@@ -52,4 +51,3 @@ extern lemlib::TrackingWheel vertical_tracking_wheel;
 extern lemlib::TrackingWheel horizontal_tracking_wheel;
 #endif
 #endif
-extern bool claw_turn_horizontal;

@@ -23,7 +23,6 @@ void build_expected(char* expected) {
 	for (auto p : left_motors.get_port_all()) mark(p, 'M');
 	for (auto p : right_motors.get_port_all()) mark(p, 'M');
 	for (auto p : cascade.get_port_all()) mark(p, 'M');
-	mark(claw_turn.get_port(), 'M');
 	mark(claw_spin.get_port(), 'M');
 	mark(intake_motor.get_port(), 'M');
 	mark(imu.get_port(), 'I');

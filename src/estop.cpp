@@ -16,7 +16,6 @@ void stop_everything() {
 	cascade.move(0);
 	intake_motor.move(0);
 	claw_spin.move(0);
-	claw_turn.move(0);
 }
 
 void estop_task_fn() {
