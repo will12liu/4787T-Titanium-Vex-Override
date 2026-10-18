@@ -12,7 +12,6 @@
 // pushing into things. Negative speed = backwards. Uses the IMU to keep facing
 // the way the robot faced when it started.
 void drive_time(int speed, int ms);
-void claw_down_45();
 
 // ---- LemLib (odometry): go to a spot on the field -------------------------------
 // The robot always knows where it is as (x, y, heading), in inches and degrees.
@@ -60,24 +59,11 @@ void lift_down();               // start lowering the lift (does NOT wait)
 void lift_wait(int timeout_ms = 1500);   // wait until the lift has reached its last target
 
 // ---- Claw ----------------------------------------------------------------------
-// The claw flips between three positions (same as the B button on the controller):
-//   claw_in()  = vertical (resting)      claw_out() = horizontal      claw_up() = slightly up
-// Each one moves the claw and waits until it is there.
-void claw_in();
-void claw_out();
-void claw_up();
-// One B-button press, same as driver control. Each moves the claw and waits.
-//   claw_next()        = intake OFF:     vertical -> highest -> angled -> horizontal (90) -> vertical
-//   claw_next_intake() = intake running: vertical -> highest -> horizontal (90) -> vertical
-// claw_in() / claw_out() / claw_up() also set where the cycle is.
-void claw_next();
-void claw_next_intake();
 // Spin the claw to drop the pin (the A button). speed 0-127 (negative = reverse),
 // ms = how long. Leave the numbers out to use CLAW_DROP_SPEED / CLAW_DROP_MS in mechanisms.h.
 void claw_drop(int speed = 1000, int ms = 0);
 
-// ---- Intake / claw spin --------------------------------------------------------
-void intake(int speed);         // intake roller, 0 = stop, negative = reverse
+// ---- Claw spin ----------------------------------------------------------------
 void spin_claw(int speed);      // claw spin motor, 0 = stop, negative = reverse (stays on until you set 0)
 void lift_secs(int ms, bool up);  // run the cascade up (true, like L1) or down (false, like L2) for ms, then stop. Waits until done
 

@@ -15,10 +15,6 @@
 
 namespace {
 
-// Where the claw is in the B-button cycle (same numbers as opcontrol):
-// 0 = vertical, 1 = highest, 2 = angled, 3 = horizontal (90 degrees).
-int claw_step = 0;
-
 // ---- Advanced settings ---------------------------------------------------------
 constexpr float STRAIGHT_KP = 3.0f;          // drive_time: how hard it steers back to straight (per degree off). 0 = off
 // ---------------------------------------------------------------------------------
@@ -39,7 +35,6 @@ int clamp_speed(int s) { return std::clamp(s, 0, 127); }
 // ================================ internal ========================================
 void auton_cmds_reset() {
 	start_ms = pros::millis();
-	claw_step = 0;
 	left_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	right_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	if (auton_odom_ready()) chassis.setPose(0, 0, 0);   // the start spot is (0, 0), facing 0
@@ -170,43 +165,6 @@ void lift_down() { auton_status("lift_down"); lift_target = LIFT_DOWN_DEG; lift_
 void lift_wait(int timeout_ms) { auton_status("lift_wait"); if (!stopped()) ::lift_wait(lift_target, timeout_ms); }
 
 // ================================== claw ==========================================
-void claw_in() { auton_status("claw_in"); claw_step = 0; claw_flip(false); claw_flip_wait(2000); }
-void claw_down_45() { auton_status("claw_down_45"); claw_step = 2; if (!stopped()) claw_lift_off(); }
-
-namespace {
-// Move the claw to the given B-cycle step and wait until it is there.
-void claw_go_to_step(int step) {
-	claw_step = step;
-	double target = step == 1 ? CLAW_TURN_HIGHEST_DEG
-	              : step == 2 ? CLAW_TURN_LIFT_DEG
-	              : step == 3 ? CLAW_TURN_HORIZONTAL_DEG
-	              : CLAW_TURN_VERTICAL_DEG;
-	claw_turn_horizontal = (step != 0);   // keep shared flag in sync with opcontrol
-	claw_turn.move_absolute(target, step != 0 ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY);
-	uint32_t start = pros::millis();
-	while (std::fabs(claw_turn.get_position() - target) > 30.0) {
-		if (pros::millis() - start > 2000 || stopped()) return;
-		pros::delay(10);
-	}
-}
-} // namespace
-
-// B's 1st press: go to the highest angle and wait until there.
-void claw_up() { auton_status("claw_up"); claw_go_to_step(1); }
-
-// Same as X's 1st press in driver control: go to horizontal (90) and wait until there.
-void claw_out() { auton_status("claw_out"); claw_go_to_step(3); }
-
-void claw_next() {
-	auton_status("claw_next");
-	claw_go_to_step((claw_step + 1) % 4);
-}
-void claw_next_intake() {
-	auton_status("claw_next_in");
-	int step = (claw_step + 1) % 4;
-	if (step == 2) step = 3;   // intake running: skip the angled stop
-	claw_go_to_step(step);
-}
 void claw_drop(int speed, int ms) {
 	auton_status("claw_drop");
 	if (speed == 1000) speed = CLAW_DROP_SPEED;
@@ -216,8 +174,7 @@ void claw_drop(int speed, int ms) {
 	claw_spin.move(0);
 }
 
-// ============================= intake / claw spin =================================
-void intake(int speed) { intake_set(speed); }
+// ================================= claw spin ======================================
 void spin_claw(int speed) { claw_spin.move(speed); }
 void lift_secs(int ms, bool up)
 {

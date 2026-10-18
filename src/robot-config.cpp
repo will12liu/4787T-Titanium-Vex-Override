@@ -14,14 +14,14 @@ pros::MotorGroup left_motors({1,4}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({-2,-3}, pros::MotorGears::blue);
 pros::MotorGroup cascade ({-20,19,-18}, pros::MotorGears::green);
 
-pros::Vision vision_sensor(17);
 pros::Motor claw_spin(15, pros::MotorGears::green);
+// Optical sensor looking into the claw's grab area (port 17, the old flip motor port).
+pros::Optical claw_optical(CLAW_OPTICAL_PORT);
 // Lift rotation sensor on the middle cascade axis (port 14).
 // Negative port = reversed; flip the sign if the number goes DOWN when the lift goes up.
 pros::Rotation lift_rot(14);
 pros::Rotation horiz_odom(-6);   // horizontal odom pod: port 6 (Brain port check), reversed (x went down sliding right). Offset measured: 2" behind the turning center (-2)
 pros::Imu imu (8);
-pros::Motor intake_motor(18, pros::MotorGears::green);
 
 
 
@@ -102,5 +102,3 @@ lemlib::OdomSensors sensors(
 #endif
 
 lemlib::Chassis chassis(drivetrain, lateral_controller, angular_controller, sensors);
-
-bool claw_turn_horizontal = false;

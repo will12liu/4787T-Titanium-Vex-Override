@@ -7,15 +7,44 @@ void mech_init() {
 	cascade.tare_position_all();   // _all: plain tare_position() only zeroes the first motor
 	lift_rot.reset_position();     // lift sensor zero = lift down at boot
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // _all, or only the first motor gets it
-	// Boot position = 0 = down (the claw boots slanted; that spot is "down").
-	claw_turn.tare_position();
-	claw_turn_horizontal = false;
-	intake_motor.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
 	claw_spin.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
 }
 
-void intake_set(int voltage) {
-	intake_motor.move(voltage);
+void claw_optical_init() {
+	claw_optical.set_led_pwm(100);   // proximity needs the LED on
+	claw_optical.disable_gesture();
+}
+
+bool claw_sees_pin() {
+	int32_t p = claw_optical.get_proximity();
+	return p != PROS_ERR && p >= CLAW_OPTICAL_PROX_MIN;   // PROS_ERR = sensor unplugged
+}
+
+bool claw_pin_just_grabbed() {
+	static uint32_t seen_since = 0;
+	static bool was_in = false;
+	if (!claw_sees_pin()) {
+		seen_since = 0;
+		was_in = false;
+		return false;
+	}
+	if (seen_since == 0) seen_since = pros::millis();
+	bool in = pros::millis() - seen_since >= (uint32_t)CLAW_OPTICAL_CONFIRM_MS;
+	bool rising = in && !was_in;
+	was_in = in;
+	return rising;
+}
+
+bool claw_spin_until_pin(int speed, int timeout_ms) {
+	uint32_t start = pros::millis();
+	claw_spin.move(speed);
+	bool got = false;
+	while (pros::millis() - start < (uint32_t)timeout_ms && !estop_triggered()) {
+		if (claw_pin_just_grabbed()) { got = true; break; }
+		pros::delay(10);
+	}
+	claw_spin.move(0);
+	return got;
 }
 
 // Lift height from the rotation sensor on the middle axis, so motor slip can't throw it off.
@@ -82,41 +111,8 @@ bool lift_wait(double deg, int timeout_ms, double tol_deg) {
 	return true;
 }
 
-// Motor flip. When the pneumatic flip arrives, replace the body of these two
-// functions with a piston set_value() + a fixed settle delay and nothing else
-// in the codebase needs to change.
-void claw_flip(bool horizontal) {
-	claw_turn_horizontal = horizontal;
-	double target = horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
-	int velocity = horizontal ? CLAW_TURN_VELOCITY : CLAW_TURN_DOWN_VELOCITY;
-	claw_turn.move_absolute(target, velocity);
-}
-
-bool claw_flip_wait(int timeout_ms, double tol_deg) {
-	double target = claw_turn_horizontal ? CLAW_TURN_HORIZONTAL_DEG : CLAW_TURN_VERTICAL_DEG;
-	uint32_t start = pros::millis();
-	while (std::fabs(claw_turn.get_position() - target) > tol_deg) {
-		if (pros::millis() - start > (uint32_t)timeout_ms || estop_triggered()) return false;
-		pros::delay(10);
-	}
-	return true;
-}
-
-bool claw_lift_off(int timeout_ms, double tol_deg) {
-	claw_turn_horizontal = true;
-	claw_turn.move_absolute(CLAW_TURN_LIFT_DEG, CLAW_TURN_VELOCITY);
-	uint32_t start = pros::millis();
-	while (std::fabs(claw_turn.get_position() - CLAW_TURN_LIFT_DEG) > tol_deg) {
-		if (pros::millis() - start > (uint32_t)timeout_ms || estop_triggered()) return false;
-		pros::delay(10);
-	}
-	return true;
-}
-
 void mech_stop_all() {
 	lift_release();
-	intake_motor.move(0);
 	claw_spin.move(0);
 	cascade.move(0);
-	claw_turn.move(0);
 }

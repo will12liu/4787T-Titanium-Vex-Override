@@ -7,7 +7,6 @@
 extern pros::MotorGroup right_motors;
 extern pros::MotorGroup left_motors;
 extern pros::MotorGroup cascade;
-extern pros::Vision vision_sensor;
 
 // Dedicated tracking wheel pods + distance sensor + claw rotation sensor.
 // Off until they are physically mounted and ports/offsets are confirmed.
@@ -21,8 +20,9 @@ extern pros::Vision vision_sensor;
 #define USE_VERTICAL_POD 0
 #define USE_HORIZONTAL_POD 1
 
-extern pros::Motor claw_turn;
 extern pros::Motor claw_spin;
+constexpr int CLAW_OPTICAL_PORT = 17;
+extern pros::Optical claw_optical;
 extern pros::adi::Pneumatics aux_piston_a;
 extern pros::adi::Pneumatics aux_piston_b;
 extern pros::Rotation horiz_odom;
@@ -38,7 +38,6 @@ extern lemlib::ControllerSettings lateral_controller;
 extern lemlib::ControllerSettings angular_controller;
 extern lemlib::OdomSensors sensors;
 extern lemlib::Chassis chassis;
-extern pros::Motor intake_motor;
 // Add drivetrain motors, IMU, other sensors here as the robot gets built
 #if USE_TRACKING_WHEELS
 #if USE_VERTICAL_POD
@@ -51,4 +50,3 @@ extern lemlib::TrackingWheel vertical_tracking_wheel;
 extern lemlib::TrackingWheel horizontal_tracking_wheel;
 #endif
 #endif
-extern bool claw_turn_horizontal;

@@ -16,11 +16,9 @@ void run_routine() {
 // 2. score pin 
 	back_to(0, -16.8, 100);                // 1) straight back off the Toggle to the score spot's y
 	face_heading(mirror(-87.1), 100);      // 2) turn so the BACK (claw side) faces our goal
-	claw_out();                            // claw vertical -> horizontal
 	back_to(mirror(21.2), -17.4, 100);     // 3) straight back to the score spot's x
 	claw_drop();    
 	wait(50);                       // claw spin (A button) to drop the pin
-	claw_up();
 	lift_secs(300,true);
 	const float FACE_H = 316.3f;
     // y the move must reach (-39.9 overshot by ~14" along the line)
@@ -31,6 +29,5 @@ void run_routine() {
 	face_heading(mirror(FACE_H), 100);              // 2) turn
 	back_dist(run, 100);                            // 3) straight line down that heading, IMU-held so it can't curve
 	spin_claw(100);
-	claw_down_45();
 	spin_claw(-127);                                // Y button: claw spin OUT (stays on until set to 0)
 }
