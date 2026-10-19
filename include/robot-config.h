@@ -12,7 +12,7 @@ extern pros::MotorGroup cascade;
 // Off until they are physically mounted and ports/offsets are confirmed.
 // Turn this on once the horizontal pod is mounted and plugged in; with it on and
 // no pod, odom reads garbage.
-#define USE_TRACKING_WHEELS 1
+#define USE_TRACKING_WHEELS 0   // OFF: odom uses the drive motor encoders + IMU only. Set to 1 to bring the horizontal pod back.
 
 // Which pods exist (only matter when USE_TRACKING_WHEELS is 1). Forward/back
 // distance comes from the drive motor encoders unless the vertical pod is on.

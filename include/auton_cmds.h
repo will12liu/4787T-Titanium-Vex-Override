@@ -21,7 +21,7 @@ void drive_time(int speed, int ms);
 //   heading 0 = facing the start direction, positive = clockwise (90 = facing +x)
 // Because every target is a fixed spot, small errors don't add up from one
 // command to the next.
-// Wrap x and headings in mirror() for a LEFT / RIGHT auton: drive_to(mirror(-20), 30).
+// Wrap x and headings in mirror() for a LEFT / RIGHT auton: drive_to(mirror(20), 30).
 // These need odometry. Without it (IMU missing) they do nothing.
 // timeout = give up after this many ms.
 
@@ -88,8 +88,9 @@ bool on_right();                // true if RIGHT was selected
 bool on_left();                 // true if LEFT was selected
 bool is_red();
 bool is_blue();
-// Flips the sign for a RIGHT auton, so you write the LEFT version once.
-//   face_heading(mirror(-85));   // faces left on LEFT, right on RIGHT
+// Flips the sign for a LEFT auton, so you write the RIGHT version once (the routine is
+// written for RIGHT: +x = toward the right).
+//   face_heading(mirror(85));   // written for RIGHT: faces right on RIGHT, left on LEFT
 float mirror(float degrees);
 
 // ---- Internal: used by autonomous.cpp ------------------------------------------

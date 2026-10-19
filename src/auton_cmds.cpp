@@ -71,7 +71,7 @@ bool on_right() { return auton_selector_get() == AutonSide::RIGHT; }
 bool on_left() { return !on_right(); }
 bool is_red() { return auton_color_get() == AutonColor::RED; }
 bool is_blue() { return !is_red(); }
-float mirror(float degrees) { return on_right() ? -degrees : degrees; }
+float mirror(float degrees) { return on_left() ? -degrees : degrees; }
 
 // ================================== waiting =======================================
 void wait(int ms) {
