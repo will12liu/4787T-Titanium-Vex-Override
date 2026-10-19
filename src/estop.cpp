@@ -42,9 +42,9 @@ void estop_start() {
 	static pros::Task estop_task(estop_task_fn);
 }
 
-void estop_arm() {
+void estop_arm(bool force) {
 	triggered = false;
-	armed = !pros::competition::is_connected();
+	armed = force || !pros::competition::is_connected();
 }
 
 void estop_disarm() {

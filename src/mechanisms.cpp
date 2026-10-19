@@ -10,41 +10,31 @@ void mech_init() {
 	claw_spin.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
 }
 
-void claw_optical_init() {
-	claw_optical.set_led_pwm(100);   // proximity needs the LED on
-	claw_optical.disable_gesture();
+namespace {
+bool claw_grabbing = false;
+bool claw_releasing = false;
 }
 
-bool claw_sees_pin() {
-	int32_t p = claw_optical.get_proximity();
-	return p != PROS_ERR && p >= CLAW_OPTICAL_PROX_MIN;   // PROS_ERR = sensor unplugged
+void claw_grab_toggle() {
+	claw_grabbing = !claw_grabbing;
+	claw_releasing = false;
 }
 
-bool claw_pin_just_grabbed() {
-	static uint32_t seen_since = 0;
-	static bool was_in = false;
-	if (!claw_sees_pin()) {
-		seen_since = 0;
-		was_in = false;
-		return false;
-	}
-	if (seen_since == 0) seen_since = pros::millis();
-	bool in = pros::millis() - seen_since >= (uint32_t)CLAW_OPTICAL_CONFIRM_MS;
-	bool rising = in && !was_in;
-	was_in = in;
-	return rising;
+void claw_release_toggle() {
+	claw_releasing = !claw_releasing;
+	claw_grabbing = false;
 }
 
-bool claw_spin_until_pin(int speed, int timeout_ms) {
-	uint32_t start = pros::millis();
-	claw_spin.move(speed);
-	bool got = false;
-	while (pros::millis() - start < (uint32_t)timeout_ms && !estop_triggered()) {
-		if (claw_pin_just_grabbed()) { got = true; break; }
-		pros::delay(10);
-	}
+void claw_driver_update() {
+	if (claw_releasing) claw_spin.move(CLAW_RELEASE_SPEED);
+	else if (claw_grabbing) claw_spin.move(CLAW_GRAB_SPEED);
+	else claw_spin.move(0);
+}
+
+void claw_driver_reset() {
+	claw_grabbing = false;
+	claw_releasing = false;
 	claw_spin.move(0);
-	return got;
 }
 
 // Lift height from the rotation sensor on the middle axis, so motor slip can't throw it off.
@@ -74,6 +64,15 @@ void cascade_move(int voltage) {
 	cascade.move(voltage);
 }
 
+double lift_drive_scale() {
+	if (lift_rot.get_position() == PROS_ERR) return 1.0;
+	double frac = (lift_pos() - LIFT_LIMIT_BOTTOM_DEG) / (LIFT_LIMIT_TOP_DEG - LIFT_LIMIT_BOTTOM_DEG);
+	if (frac <= LIFT_SLOW_START_FRAC) return 1.0;
+	frac = std::min(frac, 1.0);
+	double t = (frac - LIFT_SLOW_START_FRAC) / (1.0 - LIFT_SLOW_START_FRAC);
+	return 1.0 - t * (1.0 - LIFT_SLOW_MIN_SCALE);
+}
+
 bool lift_at(double deg, double tol_deg) {
 	return std::fabs(lift_pos() - deg) <= tol_deg;
 }
@@ -87,7 +86,10 @@ void lift_task_fn() {
 	bool holding = false;   // inside the dead band: motors stopped, brake mode holds
 	while (true) {
 		if (lift_active) {
-			double err = lift_goal_deg - lift_pos();   // + = too low, - = too high (over)
+			// Sensor numbers go DOWN as the lift goes up (or up, if the limits are the other way round),
+			// so flip the sign by the direction of "up": + = too low, - = too high (over).
+			double up = LIFT_LIMIT_TOP_DEG > LIFT_LIMIT_BOTTOM_DEG ? 1.0 : -1.0;
+			double err = (lift_goal_deg - lift_pos()) * up;
 			double a = std::fabs(err);
 			// Hysteresis: stop inside the hold band, but only start correcting again once it has
 			// slipped past the re-correct band, so a small sag doesn't make it buzz.
