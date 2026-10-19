@@ -3,6 +3,7 @@
 #include "auton.h"
 #include "estop.h"
 #include "robot-config.h"   // chassis (raw LemLib)
+#include "mechanisms.h"     // lift_pos, lift_release, cascade_move
 #include <algorithm>
 #include <cmath>
 
@@ -19,8 +20,8 @@ namespace {
 constexpr float START_Y = 0.0f;
 
 // 1. Toggle: back off, drive in and hit it, twice.
-constexpr float TOGGLE_BACK_Y = -8.4f;       // back up to this y before each hit
-constexpr int   TOGGLE_HIT_SPEED = 127;
+constexpr float TOGGLE_BACK_Y = -5.4f;       // back up to this y before each hit (was -8.4, 3" less)
+constexpr int   TOGGLE_HIT_SPEED = 100;
 constexpr int   TOGGLE_HIT_MS = 900;         // drive-in time: ends flat on the wall
 constexpr float WALL_HEADING = 0.0f;         // heading when square to the toggle wall
 constexpr float WALL_X = 0.0f, WALL_Y = 0.7f;   // robot pose when flat on the toggle wall (measured 10/13)
@@ -30,7 +31,10 @@ constexpr int   HIT2_MIN_TIME_LEFT_MS = 9000;   // GUESS: set from the real run 
 // 2. Score the pin.
 constexpr float SCORE_AWAY_Y = -13.8f;       // straight back off the toggle to this y
 constexpr float SCORE_Y = -14.4f;            // the score spot's y (same on both sides)
-constexpr double LIFT_SCORE_ROT = -140.0;    // lift rot to raise to after the toggle hits (rises while driving to the score spot)
+constexpr float SCORE_EXTRA_IN = 2.0f;        // drive this much further toward the goal at the score spot
+constexpr int   SCORE_SETTLE_MS = 250;       // pause once there, before clamping down and opening the claw
+constexpr int   CLAW_DROP_TIME_MS = 1000;    // claw open: how long R2's release spin runs (was 700)
+constexpr double LIFT_SCORE_ROT = -250.0;    // lift rot to raise to after the toggle hits (rises while driving to the score spot)
 constexpr double LIFT_CLAMP_ROT = 10.0;      // lift rot to clamp down to as the claw opens
 
 // 3. Drive away.
@@ -44,9 +48,21 @@ constexpr int SPEED = 100;
 // its own, but a lift that never gets there (stuck, sensor off) would otherwise hold the whole
 // auton until the budget runs out. Set to NO_TIMEOUT to wait forever.
 constexpr int LIFT_WAIT_MS = 1500;
+// The clamp comes down from -450 now (a much longer way than from -140), so it gets longer before the
+// claw opens. It still moves on the moment the lift is within 20 of the clamp height.
+constexpr int LIFT_CLAMP_WAIT_MS = 3000;
+// Every drive move gets a time limit. The commands have none of their own (NO_TIMEOUT = 60 s), so a move
+// that never finishes (blocked, odometry off) used to freeze the whole auton: nothing after it ran.
+constexpr int MOVE_TIMEOUT_MS = 2500;
+// The clamp drives the cascade straight down (not through the lift controller, which stops pushing
+// as soon as it is "close enough" and never corrected a lift that stopped short).
+constexpr int    CLAMP_DOWN_VOLT = 85;     // push down this hard (same as L2 in driver control)
+constexpr int    CLAMP_HOLD_VOLT = 40;     // keeps pressing down while the claw opens
+constexpr double CLAMP_TOL = 2.0;          // counts as clamped within this of LIFT_CLAMP_ROT (the bottom limit)
+constexpr int    CLAMP_MAX_MS = 2000;      // longest it pushes down before moving on
 // Short pause after each turn (and the pull-away) so the robot has settled before the next move.
 // Too short = misses the mark, too long = wastes the 15 s. 0 = no pause.
-constexpr int PAUSE_MS = 50;
+constexpr int PAUSE_MS = 50;   // brief pause between moves so the robot settles
 
 // Chained move (raw LemLib, see score_approach): how fast and how far short of the target the
 // first move hands over to the turn without stopping. 0 / 0 = stop and settle like the wrappers.
@@ -80,8 +96,10 @@ constexpr Side LEFT_SIDE  = {0.0f, 0.0f,  87.1f, -21.2f, -5.4f,  43.7f};
 // Pressed flat on the wall the pose is known exactly, so it is reset there to wipe out any
 // error (wheel slip from the hit) built up so far.
 void hit_toggle(float from_y) {
-	back_dist(from_y - TOGGLE_BACK_Y, SPEED);
+	back_dist(from_y - TOGGLE_BACK_Y, SPEED, MOVE_TIMEOUT_MS);
+	wait(PAUSE_MS);
 	drive_time(TOGGLE_HIT_SPEED, TOGGLE_HIT_MS);
+	wait(PAUSE_MS);
 	set_pose(WALL_X, WALL_Y, WALL_HEADING);
 }
 
@@ -96,7 +114,7 @@ void score_approach(const Side& side) {
 
 	// 1) straight back along y, hands over to the turn 4" early, still moving
 	if (!go()) return;
-	chassis.moveToPoint(chassis.getPose().x, SCORE_AWAY_Y, NO_TIMEOUT,
+	chassis.moveToPoint(chassis.getPose().x, SCORE_AWAY_Y, MOVE_TIMEOUT_MS,
 	                    {.forwards = false, .maxSpeed = SPEED, .minSpeed = CHAIN_MIN_SPEED, .earlyExitRange = CHAIN_EXIT_IN}, false);
 	auton_status("score turn");
 	// 2) turn so the BACK (claw side) faces our goal; hands over to the last leg a few degrees early
@@ -109,33 +127,50 @@ void score_approach(const Side& side) {
 	if (!go()) return;
 	lemlib::Pose p = chassis.getPose();
 	printf("DBG score leg3: pose x=%.1f y=%.1f th=%.1f, going %.1f in\n", p.x, p.y, p.theta, std::fabs(side.score_x - p.x));
-	back_dist(std::fabs(side.score_x - p.x), SPEED);
+	back_dist(std::fabs(side.score_x - p.x) + SCORE_EXTRA_IN, SPEED, MOVE_TIMEOUT_MS);
+}
+
+// Pushes the cascade all the way down to the bottom limit (within CLAMP_TOL of LIFT_CLAMP_ROT) or until CLAMP_MAX_MS,
+// then keeps a light downward push on. The travel limits still apply (cascade_move).
+void clamp_down() {
+	auton_status("clamp_down");
+	lift_release();   // the lift controller must not fight this
+	const uint32_t end = pros::millis() + CLAMP_MAX_MS;
+	while (pros::millis() < end && !estop_triggered() && lift_pos() < LIFT_CLAMP_ROT - CLAMP_TOL) {
+		cascade_move(-CLAMP_DOWN_VOLT);
+		pros::delay(10);
+	}
+	cascade_move(-CLAMP_HOLD_VOLT);
 }
 
 void run_side(const Side& side) {
 	set_pose(side.start_x, START_Y, side.start_heading);
 
+	// Lift starts rising right away, so it is already up by the time the robot reaches the score spot
+	lift_to_rot(LIFT_SCORE_ROT);
+
 	// 1. Hit the toggle twice
 	hit_toggle(START_Y);
-	if (auton_time_left() > HIT2_MIN_TIME_LEFT_MS) hit_toggle(WALL_Y);
+	if (auton_time_left() > HIT2_MIN_TIME_LEFT_MS) { wait(PAUSE_MS); hit_toggle(WALL_Y); }
+	wait(PAUSE_MS);
 
 	// 2. Score the pin
-	lift_to_rot(LIFT_SCORE_ROT);                   // lift rises while the robot drives to the score spot
 	score_approach(side);                          // back off, turn, back to the score spot (raw LemLib, chained)
 	lift_wait(LIFT_WAIT_MS);                       // make sure it reached the score height
-	lift_to_rot(LIFT_CLAMP_ROT);                   // clamp down...
-	claw_drop();                                   // ...while the claw spins open (A button) to drop the pin
-	lift_wait(LIFT_WAIT_MS);                       // finish the clamp before driving away
+	wait(SCORE_SETTLE_MS);                         // short pause at the score spot
+	clamp_down();                                  // clamp down first (waits until it is down)...
+	claw_release(CLAW_DROP_TIME_MS);               // ...then the claw opens the same way R2 does (release speed)
+	cascade.move(0);                               // stop pressing down (brake mode holds it)
 
 	// 3. Drive away
 	const float back_dir = (side.exit_h + 180.0f) * 3.14159265f / 180.0f;
 	const float run = EXIT_DY / std::cos(back_dir);  // distance along the untilted heading to reach the end y (the tilt does not change how far it goes)
-	drive_to(side.pull_x, SCORE_Y, SPEED);          // 1) pull away from the goal
+	drive_to(side.pull_x, SCORE_Y, SPEED, MOVE_TIMEOUT_MS);          // 1) pull away from the goal
 	wait(PAUSE_MS);
 	const float exit_heading = side.exit_h + EXIT_TILT_DEG;
 	face_heading(exit_heading, SPEED, TURN_TIMEOUT_MS, EXIT_TURN_MIN_SPEED, EXIT_TURN_EXIT_DEG);   // 2) turn, hands over a few degrees early
 	wait(PAUSE_MS);
-	back_dist(run + EXIT_EXTRA_IN, SPEED);                           // 3) straight down that heading, IMU-held so it can't curve
+	back_dist(run + EXIT_EXTRA_IN, SPEED, MOVE_TIMEOUT_MS);                           // 3) straight down that heading, IMU-held so it can't curve
 	spin_claw(CLAW_OUT_SPEED);
 }
 
