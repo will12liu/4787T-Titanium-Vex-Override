@@ -14,3 +14,11 @@ bool auton_imu_ready();
 
 // The routine itself, written in src/routine.cpp.
 void run_routine();
+
+// Practice a real match without a competition switch: runs run_routine() in its own task for
+// 15 s (hard cut-off, like the field), then returns so driver control continues.
+void autonomous_match_sim();
+
+// Run the routine as a macro during driver control (opcontrol). Blocks until it ends; L1 + R1 cancels.
+// The robot must be in the routine's start position, since the routine starts from pose (0, 0, 0).
+void auton_macro();

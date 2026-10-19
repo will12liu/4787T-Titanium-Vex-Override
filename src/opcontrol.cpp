@@ -30,23 +30,30 @@ void opcontrol() {
 	double inverse_scale = 1.0;
 	const double INVERSE_RAMP_STEP = 0.25;   // per 20 ms loop: full flip takes ~160 ms
 	master.print(2, 0, "DRIVE: FWD");
-	bool claw_spin_in = false;
-	bool claw_spin_out = false;
 	int r1_state = 0;
 	bool cascade_intake_active = false;
 	// Cascade brake mode is CASCADE_BRAKE_MODE in mechanisms.h (no active hold).
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);   // set in mechanisms.h
 
 	while (true) {
-		// Auton test: D-pad DOWN runs autonomous() once. Only works with no
-		// competition switch / field control plugged in, so it can't fire in a match.
+		// Match sim: D-pad DOWN runs the auton like the field does (own task, hard 15 s cut-off),
+		// then driver control carries on. Only works with no competition switch / field
+		// control plugged in, so it can't fire in a match.
 		if (!pros::competition::is_connected() && !tuning_active() &&
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
-			autonomous();
+			autonomous_match_sim();
 			cascade_intake_active = false;
 			r1_state = 0;
-			claw_spin_in = false;
-			claw_spin_out = false;
+			claw_driver_reset();
+		}
+		// Macro: hold B and press Y to run the routine during driver control. Works in a match
+		// (driver control only; the field never lets opcontrol run during auton). L1 + R1 cancels.
+		if (!tuning_active() && master.get_digital(pros::E_CONTROLLER_DIGITAL_B) &&
+		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
+			auton_macro();
+			cascade_intake_active = false;
+			r1_state = 0;
+			claw_driver_reset();
 		}
 		// 1. Drivetrain
 		// D-pad Up toggles inverted driving: the claw side becomes the front, so stick up
@@ -67,6 +74,10 @@ void opcontrol() {
 		if (std::abs(dir) < 10) dir = 0;
 		if (std::abs(turn) < 10) turn = 0;
 		dir = (int)std::lround(dir * inverse_scale);
+		// Anti-tip: the higher the lift, the less drive power.
+		double tip_scale = lift_drive_scale();
+		dir = (int)std::lround(dir * tip_scale);
+		turn = (int)std::lround(turn * tip_scale);
 
 		int left = std::clamp(dir + turn, -127, 127);
 		int right = std::clamp(dir - turn, -127, 127);
@@ -82,17 +93,10 @@ void opcontrol() {
 		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) &&
 		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
-		// R1 toggles claw spin OUT; switching directions cancels spin IN.
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
-			claw_spin_out = !claw_spin_out;
-			claw_spin_in = false;
-		}
-		// R2 or A toggles the claw release spin; switching directions cancels the grab spin.
+		// R1 toggles the claw GRAB, R2 or A toggles the claw RELEASE (see claw_driver_update).
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) claw_grab_toggle();
 		if ((master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) ||
-		     master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) && !estop_combo) {
-			claw_spin_in = !claw_spin_in;
-			claw_spin_out = false;
-		}
+		     master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) && !estop_combo) claw_release_toggle();
 
 		// R1 moves to the intake height. Manual controls cancel that target.
 		if (estop_combo) {
@@ -114,19 +118,7 @@ void opcontrol() {
 			cascade.move(0);
 		}
 
-		// Optical sensor sees a pin inside the claw: stop spinning in. On the robot R1 is the grab
-		// spin, which is the variable named claw_spin_out (-127); the names are backwards from the
-		// physical direction. Checked every loop so the debounce keeps running; only the new-grab
-		// edge cancels, so R1 again spins with it inside.
-		if (claw_pin_just_grabbed() && claw_spin_out) claw_spin_out = false;
-
-		if (claw_spin_in) {
-			claw_spin.move(85);
-		} else if (claw_spin_out) {
-			claw_spin.move(-127);
-		} else {
-			claw_spin.move(0);
-		}
+		claw_driver_update();
 
 		pros::delay(20);
 	}

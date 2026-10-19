@@ -25,7 +25,6 @@ void build_expected(char* expected) {
 	for (auto p : cascade.get_port_all()) mark(p, 'M');
 	mark(claw_spin.get_port(), 'M');
 	mark(imu.get_port(), 'I');
-	mark(claw_optical.get_port(), 'O');
 	mark(lift_rot.get_port(), 'R');
 #if USE_TRACKING_WHEELS
 #if USE_VERTICAL_POD
@@ -70,13 +69,11 @@ void initialize() {
 			pros::screen::print(pros::E_TEXT_MEDIUM, 1, "ports  123456789012345678901");
 			pros::screen::print(pros::E_TEXT_MEDIUM, 2, "expect %s", expected);
 			pros::screen::print(pros::E_TEXT_MEDIUM, 3, "brain  %s", seen);
-			pros::screen::print(pros::E_TEXT_MEDIUM, 4, "claw prox %3d (stop at %d)   ", (int)claw_optical.get_proximity(), CLAW_OPTICAL_PROX_MIN);
 			pros::delay(200);
 		}
 	});
 
 	mech_init();             // tare lift + claw flip, set brake modes. Lift must be fully down.
-	claw_optical_init();     // LED on for the claw optical sensor
 	auton_selector_start();  // LEFT / RIGHT buttons on the Brain + controller D-pad
 	auton_init();            // find IMU, calibrate LemLib chassis (blocks ~2-3 s)
 	tuning_start();          // TUNE button on the Brain: PID + sensor tuning

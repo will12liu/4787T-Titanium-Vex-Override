@@ -1,7 +1,6 @@
 #include "robot-config.h"
 
 #include "pros/motors.hpp"
-#include "pros/optical.hpp"
 #include "pros/adi.hpp"
 #include "pros/imu.hpp"
 #include "lemlib/api.hpp"
@@ -14,9 +13,7 @@ pros::MotorGroup left_motors({1,4}, pros::MotorGears::blue);
 pros::MotorGroup right_motors({-2,-3}, pros::MotorGears::blue);
 pros::MotorGroup cascade ({-20,19,-18}, pros::MotorGears::green);
 
-pros::Motor claw_spin(15, pros::MotorGears::green);
-// Optical sensor looking into the claw's grab area (port 17, the old flip motor port).
-pros::Optical claw_optical(CLAW_OPTICAL_PORT);
+pros::Motor claw_spin(17, pros::MotorGears::green);
 // Lift rotation sensor on the middle cascade axis (port 14).
 // Negative port = reversed; flip the sign if the number goes DOWN when the lift goes up.
 pros::Rotation lift_rot(14);

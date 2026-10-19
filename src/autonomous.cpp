@@ -53,10 +53,12 @@ bool auton_imu_ready() { return imu_ready; }
 // commands (drive_to, face, ...) need it.
 bool auton_odom_ready() { return odom_ready; }
 
-void autonomous() {
+namespace {
+// macro = run from driver control: L1 + R1 cancels it even in a match.
+void run_auton(bool macro) {
 	auton_cmds_reset();
-	auton_status("start");
-	estop_arm();   // L1 + R1 stops the run (test runs only, never in a match)
+	auton_status(macro ? "macro start" : "start");
+	estop_arm(macro);   // L1 + R1 stops the run (test runs and the macro, never the real auton)
 
 	if (!odom_ready) auton_status("NO IMU: LemLib moves skipped");
 	run_routine();   // the routine itself lives in src/routine.cpp
@@ -65,5 +67,37 @@ void autonomous() {
 	left_motors.move(0);
 	right_motors.move(0);
 	mech_stop_all();
-	auton_status(estop_triggered() ? "E-STOPPED" : "end");
+	auton_status(estop_triggered() ? "E-STOPPED" : auton_out_of_time() ? "TIME UP" : "end");
+}
+} // namespace
+
+void autonomous() { run_auton(false); }
+
+// Driver-control macro: runs the routine from the opcontrol task. Legal in driver control (the
+// rules only forbid driver input during the autonomous period). Blocks until done; L1 + R1 cancels.
+void auton_macro() { run_auton(true); }
+
+// Match simulation for practice without a competition switch. Runs autonomous() the way the field
+// does: in its own task, and killed hard at 15 s if it is still going. Driver control (the caller)
+// starts again afterwards. E-STOP (L1 + R1) still works as a safety, unlike in a real match.
+void autonomous_match_sim() {
+	constexpr uint32_t AUTON_MS = 15000;
+	static volatile bool done;
+	done = false;
+	pros::Controller(pros::E_CONTROLLER_MASTER).rumble(".");
+	pros::Task auton_task([]() {
+		autonomous();
+		done = true;
+	});
+	uint32_t start = pros::millis();
+	while (!done && pros::millis() - start < AUTON_MS) pros::delay(10);
+	if (!done) {   // the field would have killed it here
+		auton_task.remove();
+		chassis.cancelAllMotions();   // a killed LemLib move leaves its state set
+		left_motors.move(0);
+		right_motors.move(0);
+		mech_stop_all();
+		auton_status("CUT OFF at 15s");
+	}
+	pros::Controller(pros::E_CONTROLLER_MASTER).rumble("-");   // auton over, driver control
 }

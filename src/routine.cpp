@@ -1,33 +1,96 @@
-
 #include "main.h"
 #include "auton_cmds.h"
+#include "auton.h"
+#include "estop.h"
+#include "robot-config.h"   // chassis (raw LemLib)
+#include <algorithm>
 #include <cmath>
 
-void run_routine() {
-	// 1. Hit the Toggle twice 
-	back_to(0.0, -8.4,100);      // back up to y = -8.4 (no settle: the hit below lines it up)
-	drive_time(127, 900);//forward
-	set_pose(0, 0.7, 0);   
-	wait(50); //wait
-	back_to(0.0, -8.4, 100);      // back up to y = -8.4
-	drive_time(127, 900);        // hit 2: drive in
-	set_pose(0, 0.7, 0);         // pressed flat on the wall: exact spot (measured 10/13), wipes out wheel slip from the hits
+// =============================================================================
+// The routine. All the field numbers are in this block: change them here, not in the steps.
+// Inches / degrees, written for the LEFT side (RIGHT is mirrored by mirror()).
+// =============================================================================
+namespace {
+
+// Where the robot's centre is when the auton starts, and which way it faces. The auton works in
+// coordinates where the start is (0, 0, 0); if you place the robot differently on the start
+// line, change these and everything below shifts with it.
+constexpr float START_X = 0.0f, START_Y = 0.0f, START_HEADING = 0.0f;
+
+// 1. Toggle: back off, drive in and hit it, twice.
+constexpr float TOGGLE_BACK_Y = -8.4f;       // back up to this y before each hit
+constexpr int   TOGGLE_HIT_SPEED = 127;
+constexpr int   TOGGLE_HIT_MS = 900;         // drive-in time: ends flat on the wall
+constexpr float WALL_X = 0.0f, WALL_Y = 0.7f;   // robot pose when flat on the toggle wall (measured 10/13)
+// The 2nd hit is skipped when less than this is left, so the pin still gets scored.
+constexpr int   HIT2_MIN_TIME_LEFT_MS = 9000;   // GUESS: set from the real run times
+
+// 2. Score the pin.
+constexpr float SCORE_AWAY_Y = -16.8f;       // straight back off the toggle to this y
+constexpr float SCORE_FACE_H = -87.1f;       // heading so the back (claw side) faces our goal
+constexpr float SCORE_X = 21.2f, SCORE_Y = -17.4f;   // the score spot
+constexpr double LIFT_BUMP_DEG = 300.0;      // PLACEHOLDER: lift up / down this many rotation-sensor degrees after dropping. Measure it
+
+// 3. Drive away.
+constexpr float PULL_X = 5.4f;               // pull away from the goal to this x
+constexpr float EXIT_H = 316.3f;             // heading for the final straight back-up
+constexpr float EXIT_DY = -16.0f;            // y change of the final back-up
+constexpr int   CLAW_OUT_SPEED = -127;       // Y button: claw spin OUT, stays on until the auton ends
+
+constexpr int SPEED = 100;
+
+// Chained move (raw LemLib, see score_approach): how fast and how far short of the target the
+// first move hands over to the turn without stopping. 0 / 0 = stop and settle like the wrappers.
+constexpr float CHAIN_MIN_SPEED = 50.0f;
+constexpr float CHAIN_EXIT_IN = 4.0f;
+
+// Backs into the toggle wall and hits it. Pressed flat on the wall the pose is known exactly,
+// so it is reset there to wipe out any error (wheel slip from the hit) built up so far.
+void hit_toggle() {
+	back_to(WALL_X, TOGGLE_BACK_Y, SPEED);
+	drive_time(TOGGLE_HIT_SPEED, TOGGLE_HIT_MS);
+	set_pose(WALL_X, WALL_Y, 0);
 	wait(50);
-// 2. score pin 
-	back_to(0, -16.8, 100);                // 1) straight back off the Toggle to the score spot's y
-	face_heading(mirror(-87.1), 100);      // 2) turn so the BACK (claw side) faces our goal
-	back_to(mirror(21.2), -17.4, 100);     // 3) straight back to the score spot's x
-	claw_drop();    
-	wait(50);                       // claw spin (A button) to drop the pin
-	lift_secs(300,true);
-	const float FACE_H = 316.3f;
-    // y the move must reach (-39.9 overshot by ~14" along the line)
-	const float back_dir = (FACE_H + 180.0f) * 3.14159265f / 180.0f;
-	const float run = (-16.0) / std::cos(back_dir);          // distance along that heading to reach END_Y
-	drive_to(mirror(5.4), -17.4, 100);              // 1) pull away from the goal to x = 5.4
-	lift_secs(300,false);
-	face_heading(mirror(FACE_H), 100);              // 2) turn
-	back_dist(run, 100);                            // 3) straight line down that heading, IMU-held so it can't curve
-	spin_claw(100);
-	spin_claw(-127);                                // Y button: claw spin OUT (stays on until set to 0)
+}
+
+void score_approach() {
+	if (!auton_odom_ready()) return;
+	auto t = [](int ms) { return std::min(ms, auton_time_left()); };
+	auto go = []() { return !estop_triggered() && !auton_out_of_time(); };
+
+	// 1) straight back along y, hands over to the turn 4" early, still moving
+	if (!go()) return;
+	chassis.moveToPoint(chassis.getPose().x, SCORE_AWAY_Y, t(3000),
+	                    {.forwards = false, .maxSpeed = SPEED, .minSpeed = CHAIN_MIN_SPEED, .earlyExitRange = CHAIN_EXIT_IN}, false);
+	// 2) turn so the BACK (claw side) faces our goal; stops fully so the next leg is square
+	if (!go()) return;
+	chassis.turnToHeading(mirror(SCORE_FACE_H), t(1500), {.maxSpeed = SPEED}, false);
+	// 3) straight back along x to the score spot, settles
+	if (!go()) return;
+	chassis.moveToPoint(mirror(SCORE_X), chassis.getPose().y, t(3000), {.forwards = false, .maxSpeed = SPEED}, false);
+}
+
+} // namespace
+
+void run_routine() {
+	set_pose(mirror(START_X), START_Y, mirror(START_HEADING));
+
+	// 1. Hit the toggle twice
+	hit_toggle();
+	if (auton_time_left() > HIT2_MIN_TIME_LEFT_MS) hit_toggle();
+
+	// 2. Score the pin
+	score_approach();                              // back off, turn, back to the score spot (raw LemLib, chained)
+	claw_drop();                                   // claw spin (A button) to drop the pin
+	wait(50);
+	lift_by(LIFT_BUMP_DEG);
+
+	// 3. Drive away
+	const float back_dir = (EXIT_H + 180.0f) * 3.14159265f / 180.0f;
+	const float run = EXIT_DY / std::cos(back_dir);  // distance along that heading to reach the end y
+	drive_to(mirror(PULL_X), SCORE_Y, SPEED);        // 1) pull away from the goal
+	lift_by(-LIFT_BUMP_DEG);
+	face_heading(mirror(EXIT_H), SPEED);             // 2) turn
+	back_dist(run, SPEED);                           // 3) straight down that heading, IMU-held so it can't curve
+	spin_claw(CLAW_OUT_SPEED);
 }

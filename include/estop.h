@@ -12,7 +12,8 @@
 void estop_start();
 
 // Arm before a routine starts, disarm when it ends. arm() clears a previous stop.
-void estop_arm();
+// force = arm even with a competition switch / field connected (used by the driver-control macro).
+void estop_arm(bool force = false);
 void estop_disarm();
 
 // True once L1 + R1 were pressed while armed. Routines check this between steps.
