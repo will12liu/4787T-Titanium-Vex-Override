@@ -60,7 +60,7 @@ void run_auton(bool macro) {
 	auton_status(macro ? "macro start" : "start");
 	estop_arm(macro);   // L1 + R1 stops the run (test runs and the macro, never the real auton)
 
-	if (!imu_ready) auton_status("NO IMU: turns and distances skipped");
+	if (!odom_ready) auton_status("NO IMU: LemLib moves skipped");
 	run_routine();   // the routine itself lives in src/routine.cpp
 
 	estop_disarm();
