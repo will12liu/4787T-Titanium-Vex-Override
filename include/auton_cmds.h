@@ -23,44 +23,19 @@ constexpr int TURN_TIMEOUT_MS = 1000;
 // the way the robot faced when it started.
 void drive_time(int speed, int ms);
 
-// ---- LemLib (odometry): go to a spot on the field -------------------------------
-// The robot always knows where it is as (x, y, heading), in inches and degrees.
-// At the start of the auton that is (0, 0, 0):
-//   (0, 0)    = where the robot's centre was when the auton started
-//   +y        = the way the robot was facing at the start, +x = to its right
-//   heading 0 = facing the start direction, positive = clockwise (90 = facing +x)
-// Because every target is a fixed spot, small errors don't add up from one
-// command to the next.
-// Wrap x and headings in mirror() for a LEFT / RIGHT auton: drive_to(mirror(20), 30).
-// These need odometry. Without it (IMU missing) they do nothing.
-// timeout = give up after this many ms.
-
-// Tell the robot where it is. Use it when the robot is pressed flat against a
-// wall, where you know its exact position, to wipe out any error built up so far.
-void set_pose(float x, float y, float heading);
-
-// Drive to (x, y), turning toward it on the way. drive_to goes front first,
-// back_to goes back first (claw side).
-//
-// CHAINING (don't stop between moves): give min_speed > 0 (e.g. 40-60) and early_exit (inches
-// from the target, e.g. 4-8) and the move ends that far short of the target still moving at
-// min_speed, so the next command starts without a settle. It is less exact: use it when the next
-// move takes over anyway. Leave both 0 for the normal stop-and-settle. Same options on the
-// pose moves and face_heading (early_exit there is in degrees).
-void drive_to(float x, float y, int speed = 100, int timeout_ms = NO_TIMEOUT, float min_speed = 0, float early_exit = 0);
-void back_to(float x, float y, int speed = 100, int timeout_ms = NO_TIMEOUT, float min_speed = 0, float early_exit = 0);
-// back_dist: back up in a dead-straight line for `inches` along the heading the robot faces now
-// (face_heading first). Holds that heading with the IMU, measures distance with odometry.
-void back_dist(float inches, int speed = 100, int timeout_ms = NO_TIMEOUT, float heading = NAN);   // heading: steer to this absolute heading while driving (lets the turn before it end early); NAN = hold the current one
-
-// Turn in place to face the point (x, y), or to face a heading.
-void face(float x, float y, int speed = 100, int timeout_ms = TURN_TIMEOUT_MS);
-void face_heading(float heading, int speed = 100, int timeout_ms = TURN_TIMEOUT_MS, float min_speed = 0, float early_exit = 0);
-
-// Drive on a curve to (x, y) and arrive facing `heading`. back_to_pose drives
-// back first, and `heading` is still the way the FRONT faces when it arrives.
-void drive_to_pose(float x, float y, float heading, int speed = 100, int timeout_ms = NO_TIMEOUT, float min_speed = 0, float early_exit = 0);
-void back_to_pose(float x, float y, float heading, int speed = 100, int timeout_ms = NO_TIMEOUT, float min_speed = 0, float early_exit = 0);
+// ---- IMU turns + encoder distances (no odometry) ---------------------------------
+// Distance is measured with the drive motor encoders and heading with the IMU, which is zeroed
+// at the start of the auton (the robot starts facing heading 0). Headings are clockwise positive:
+// 90 = a quarter turn right, -90 = left. These need the IMU; without it they do nothing.
+// Straight drive: + inches = forward, back_dist = backward. The IMU holds the heading the robot
+// has when the move starts, so turn first (face_heading), then drive.
+void drive_dist(float inches, int speed = 100);
+void back_dist(float inches, int speed = 100);
+// Tell the robot which way it faces (IMU heading). Use it when the robot is pressed flat against a
+// wall, where you know the heading exactly, to wipe out any drift built up so far.
+void set_heading(float heading);
+// Turn in place to a heading (shortest way). Ends within 1.5 degrees, or after TURN_TIMEOUT_MS.
+void face_heading(float heading, int speed = 100);
 
 // ---- Time budget ---------------------------------------------------------------
 // The auton has a 15 s budget (AUTON_BUDGET_MS in auton_cmds.cpp, a little under 15 s). When it
