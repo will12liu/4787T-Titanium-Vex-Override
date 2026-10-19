@@ -20,6 +20,9 @@ constexpr float STRAIGHT_KP = 3.0f;          // drive_time: how hard it steers b
 // Auton is 15 s. Stop a little early so the routine ends cleanly (motors braked, claw off)
 // instead of being cut off mid-move by the field.
 constexpr int AUTON_BUDGET_MS = 14800;
+// false = the routine is NOT stopped by the budget: it runs until it finishes or the field / match
+// sim cuts it at 15 s. The budget is then only used for skip decisions (auton_time_left()).
+constexpr bool END_AT_BUDGET = false;
 // A move counts as "straight along an axis" when the other axis differs by less than this (inches).
 // Then that coordinate is kept where it is, so tuning error in the target can't make it curve.
 constexpr float AXIS_LOCK_TOL_IN = 1.5f;
@@ -34,10 +37,10 @@ uint32_t start_ms = 0;
 int time_left() { return AUTON_BUDGET_MS - (int)(pros::millis() - start_ms); }
 
 // E-STOP or out of time: every command stops right away and later ones do nothing.
-bool stopped() { return estop_triggered() || time_left() <= 0; }
+bool stopped() { return estop_triggered() || (END_AT_BUDGET && time_left() <= 0); }
 
 // A move can never run past the end of the budget.
-int cap(int timeout_ms) { return std::min(timeout_ms, std::max(time_left(), 0)); }
+int cap(int timeout_ms) { return END_AT_BUDGET ? std::min(timeout_ms, std::max(time_left(), 0)) : timeout_ms; }
 
 void stop_drive() {
 	left_motors.move(0);
@@ -57,10 +60,16 @@ void auton_cmds_reset() {
 }
 
 int auton_time_left() { return std::max(time_left(), 0); }
-bool auton_out_of_time() { return time_left() <= 0; }
+bool auton_out_of_time() { return END_AT_BUDGET && time_left() <= 0; }
+
+namespace { char last_msg[24] = ""; int last_ms = 0; }
+const char* auton_last_step() { return last_msg; }
+int auton_last_step_ms() { return last_ms; }
 
 void auton_status(const char* msg) {
 	int t = (int)(pros::millis() - start_ms);
+	snprintf(last_msg, sizeof(last_msg), "%s", msg);
+	last_ms = t;
 	pros::screen::print(pros::E_TEXT_MEDIUM, 5, "auton %-4s %-5s %5dms %-12s",
 	                    is_red() ? "RED" : "BLUE", on_right() ? "RIGHT" : "LEFT", t, msg);
 	printf("DBG auton t=%d %s\n", t, msg);
@@ -126,7 +135,7 @@ void axis_lock(float& x, float& y, bool forwards) {
 	if (!forwards) h += 180.0f;
 	float err = std::fmod(h - (float)p.theta + 540.0f, 360.0f) - 180.0f;   // -180..180
 	if (std::fabs(err) > ALIGN_TOL_DEG && !stopped())
-		chassis.turnToHeading(h, cap(1500), {.maxSpeed = 100}, false);
+		chassis.turnToHeading(h, cap(TURN_TIMEOUT_MS), {.maxSpeed = 100}, false);
 }
 } // namespace
 
@@ -151,10 +160,14 @@ void back_to(float x, float y, int speed, int timeout_ms, float min_speed, float
 // Back up in a dead-straight line for `inches`, holding the heading the robot has right now
 // (IMU steering, like drive_time) and measuring the distance with odometry. Face the way you
 // want to go first (face_heading), then call this. No path planning, so it can't curve.
-void back_dist(float inches, int speed, int timeout_ms) {
+// With `heading` given it steers toward that absolute heading instead of holding the current
+// one, so you can start it before the turn has fully settled (face_heading with early_exit) and
+// it finishes the turn while driving: no pause, and it still ends on the exact heading.
+void back_dist(float inches, int speed, int timeout_ms, float heading) {
 	if (!odom_ok("back_dist")) return;
 	lemlib::Pose start = chassis.getPose();
 	double hold = imu.get_rotation();
+	const bool absolute = !std::isnan(heading);
 	uint32_t end = pros::millis() + timeout_ms;
 	while (pros::millis() < end && !stopped()) {
 		lemlib::Pose p = chassis.getPose();
@@ -163,7 +176,9 @@ void back_dist(float inches, int speed, int timeout_ms) {
 		if (left_in <= 0.5) break;
 		int v = clamp_speed(speed);
 		if (left_in < 6.0) v = std::max(35, (int)(v * left_in / 6.0));   // ease in over the last 6"
-		int turn_part = (int)std::clamp(STRAIGHT_KP * (hold - imu.get_rotation()), -40.0, 40.0);
+		double err = absolute ? std::fmod(heading - p.theta + 540.0, 360.0) - 180.0   // shortest way to the target, -180..180
+		                      : hold - imu.get_rotation();
+		int turn_part = (int)std::clamp(STRAIGHT_KP * err, -40.0, 40.0);
 		left_motors.move(std::clamp(-v + turn_part, -127, 127));
 		right_motors.move(std::clamp(-v - turn_part, -127, 127));
 		pros::delay(10);
@@ -194,6 +209,14 @@ void back_to_pose(float x, float y, float heading, int speed, int timeout_ms, fl
 // ================================== lift ==========================================
 namespace { double lift_target = LIFT_DOWN_DEG; }
 void lift_goal() { auton_status("lift_goal"); lift_target = LIFT_ALLIANCE_GOAL_DEG; lift_to(lift_target); }
+void lift_to_rot(double rot) {
+	auton_status("lift_to_rot");
+	printf("DBG lift_to_rot rot=%.0f pos=%.0f stopped=%d time_left=%d\n", rot, lift_pos(), (int)stopped(), time_left());
+	pros::screen::print(pros::E_TEXT_MEDIUM, 4, "lift_to_rot %5.0f called, pos %5.0f %s   ", rot, lift_pos(), stopped() ? "STOPPED" : "ok");
+	if (stopped()) return;
+	lift_target = rot;
+	lift_to(rot);
+}
 void lift_down() { auton_status("lift_down"); lift_target = LIFT_DOWN_DEG; lift_to(lift_target); }
 void lift_wait(int timeout_ms) { auton_status("lift_wait"); if (!stopped()) ::lift_wait(lift_target, timeout_ms); }
 

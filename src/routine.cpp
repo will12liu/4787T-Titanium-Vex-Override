@@ -28,20 +28,38 @@ constexpr float WALL_X = 0.0f, WALL_Y = 0.7f;   // robot pose when flat on the t
 constexpr int   HIT2_MIN_TIME_LEFT_MS = 9000;   // GUESS: set from the real run times
 
 // 2. Score the pin.
-constexpr float SCORE_AWAY_Y = -16.8f;       // straight back off the toggle to this y
-constexpr float SCORE_Y = -17.4f;            // the score spot's y (same on both sides)
-constexpr double LIFT_BUMP_DEG = 300.0;      // PLACEHOLDER: lift up / down this many rotation-sensor degrees after dropping. Measure it
+constexpr float SCORE_AWAY_Y = -13.8f;       // straight back off the toggle to this y
+constexpr float SCORE_Y = -14.4f;            // the score spot's y (same on both sides)
+constexpr double LIFT_SCORE_ROT = -140.0;    // lift rot to raise to after the toggle hits (rises while driving to the score spot)
+constexpr double LIFT_CLAMP_ROT = 10.0;      // lift rot to clamp down to as the claw opens
 
 // 3. Drive away.
 constexpr float EXIT_DY = -16.0f;            // y change of the final back-up
+constexpr float EXIT_TILT_DEG = -15.0f;      // tilt the final back-up heading: negative = left (counter-clockwise), both sides
+constexpr float EXIT_EXTRA_IN = -1.0f;       // distance added to the final back-up (was +2, it went ~3" too far)
 constexpr int   CLAW_OUT_SPEED = -127;       // Y button: claw spin OUT, stays on until the auton ends
 
 constexpr int SPEED = 100;
+// How long to wait for the lift to reach a height before carrying on. Every move has no timeout of
+// its own, but a lift that never gets there (stuck, sensor off) would otherwise hold the whole
+// auton until the budget runs out. Set to NO_TIMEOUT to wait forever.
+constexpr int LIFT_WAIT_MS = 1500;
+// Short pause after each turn (and the pull-away) so the robot has settled before the next move.
+// Too short = misses the mark, too long = wastes the 15 s. 0 = no pause.
+constexpr int PAUSE_MS = 50;
 
 // Chained move (raw LemLib, see score_approach): how fast and how far short of the target the
 // first move hands over to the turn without stopping. 0 / 0 = stop and settle like the wrappers.
 constexpr float CHAIN_MIN_SPEED = 50.0f;
 constexpr float CHAIN_EXIT_IN = 4.0f;
+// The turn toward the score spot also hands over without stopping: it ends this many degrees short
+// of the heading, still turning at this speed, and the last leg takes over. 0 / 0 = full stop.
+constexpr int   TURN_CHAIN_MIN_SPEED = 0;    // 0 / 0: off (full stop, then PAUSE_MS). Was 40 / 6 and missed the mark
+constexpr float TURN_CHAIN_EXIT_DEG = 0.0f;
+// The exit turn can hand over early the same way. Leave at 0 / 0: back_dist holds the heading the turn
+// ended on, so an early hand-over would lock in the leftover error.
+constexpr int   EXIT_TURN_MIN_SPEED = 0;     // 0 / 0: off (full stop, then PAUSE_MS). Was 30 / 6
+constexpr float EXIT_TURN_EXIT_DEG = 0.0f;
 
 // Everything that differs between the two sides. x in inches (+ = right), headings in degrees
 // (+ = clockwise). LEFT is RIGHT with the signs flipped.
@@ -65,7 +83,6 @@ void hit_toggle(float from_y) {
 	back_dist(from_y - TOGGLE_BACK_Y, SPEED);
 	drive_time(TOGGLE_HIT_SPEED, TOGGLE_HIT_MS);
 	set_pose(WALL_X, WALL_Y, WALL_HEADING);
-	wait(50);
 }
 
 // The combined movement, written with LemLib's chassis directly so the moves run into each other:
@@ -75,19 +92,24 @@ void hit_toggle(float from_y) {
 // so x and y are read from the current pose by hand to keep the straight legs straight.
 void score_approach(const Side& side) {
 	if (!auton_odom_ready()) return;
-	auto t = [](int ms) { return std::min(ms, auton_time_left()); };
 	auto go = []() { return !estop_triggered() && !auton_out_of_time(); };
 
 	// 1) straight back along y, hands over to the turn 4" early, still moving
 	if (!go()) return;
-	chassis.moveToPoint(chassis.getPose().x, SCORE_AWAY_Y, t(3000),
+	chassis.moveToPoint(chassis.getPose().x, SCORE_AWAY_Y, NO_TIMEOUT,
 	                    {.forwards = false, .maxSpeed = SPEED, .minSpeed = CHAIN_MIN_SPEED, .earlyExitRange = CHAIN_EXIT_IN}, false);
-	// 2) turn so the BACK (claw side) faces our goal; stops fully so the next leg is square
+	auton_status("score turn");
+	// 2) turn so the BACK (claw side) faces our goal; hands over to the last leg a few degrees early
 	if (!go()) return;
-	chassis.turnToHeading(side.score_face_h, t(1500), {.maxSpeed = SPEED}, false);
-	// 3) straight back along x to the score spot, settles
+	chassis.turnToHeading(side.score_face_h, TURN_TIMEOUT_MS,
+	                      {.maxSpeed = SPEED, .minSpeed = TURN_CHAIN_MIN_SPEED, .earlyExitRange = TURN_CHAIN_EXIT_DEG}, false);
+	// 3) straight back along x to the score spot's x. back_dist drives a measured distance while
+	// holding the heading the turn ended on (no LemLib point-move, so it can't curve or exit early).
+	wait(PAUSE_MS);
 	if (!go()) return;
-	chassis.moveToPoint(side.score_x, chassis.getPose().y, t(3000), {.forwards = false, .maxSpeed = SPEED}, false);
+	lemlib::Pose p = chassis.getPose();
+	printf("DBG score leg3: pose x=%.1f y=%.1f th=%.1f, going %.1f in\n", p.x, p.y, p.theta, std::fabs(side.score_x - p.x));
+	back_dist(std::fabs(side.score_x - p.x), SPEED);
 }
 
 void run_side(const Side& side) {
@@ -98,18 +120,22 @@ void run_side(const Side& side) {
 	if (auton_time_left() > HIT2_MIN_TIME_LEFT_MS) hit_toggle(WALL_Y);
 
 	// 2. Score the pin
+	lift_to_rot(LIFT_SCORE_ROT);                   // lift rises while the robot drives to the score spot
 	score_approach(side);                          // back off, turn, back to the score spot (raw LemLib, chained)
-	claw_drop();                                   // claw spin (A button) to drop the pin
-	wait(50);
-	lift_by(LIFT_BUMP_DEG);
+	lift_wait(LIFT_WAIT_MS);                       // make sure it reached the score height
+	lift_to_rot(LIFT_CLAMP_ROT);                   // clamp down...
+	claw_drop();                                   // ...while the claw spins open (A button) to drop the pin
+	lift_wait(LIFT_WAIT_MS);                       // finish the clamp before driving away
 
 	// 3. Drive away
 	const float back_dir = (side.exit_h + 180.0f) * 3.14159265f / 180.0f;
-	const float run = EXIT_DY / std::cos(back_dir);  // distance along that heading to reach the end y
-	drive_to(side.pull_x, SCORE_Y, SPEED);           // 1) pull away from the goal
-	lift_by(-LIFT_BUMP_DEG);
-	face_heading(side.exit_h, SPEED);                // 2) turn
-	back_dist(run, SPEED);                           // 3) straight down that heading, IMU-held so it can't curve
+	const float run = EXIT_DY / std::cos(back_dir);  // distance along the untilted heading to reach the end y (the tilt does not change how far it goes)
+	drive_to(side.pull_x, SCORE_Y, SPEED);          // 1) pull away from the goal
+	wait(PAUSE_MS);
+	const float exit_heading = side.exit_h + EXIT_TILT_DEG;
+	face_heading(exit_heading, SPEED, TURN_TIMEOUT_MS, EXIT_TURN_MIN_SPEED, EXIT_TURN_EXIT_DEG);   // 2) turn, hands over a few degrees early
+	wait(PAUSE_MS);
+	back_dist(run + EXIT_EXTRA_IN, SPEED);                           // 3) straight down that heading, IMU-held so it can't curve
 	spin_claw(CLAW_OUT_SPEED);
 }
 
@@ -118,7 +144,13 @@ void run_side(const Side& side) {
 void routine_right() { run_side(RIGHT_SIDE); }
 void routine_left() { run_side(LEFT_SIDE); }
 
+// TEST: on BLUE the two sides swap (blue right runs the left numbers and blue left the right ones).
+// Set to false to go back to colour not mattering.
+constexpr bool BLUE_INVERTS_SIDE = true;
+
 void run_routine() {
-	if (on_right()) routine_right();
+	bool right = on_right();
+	if (BLUE_INVERTS_SIDE && is_blue()) right = !right;
+	if (right) routine_right();
 	else routine_left();
 }
