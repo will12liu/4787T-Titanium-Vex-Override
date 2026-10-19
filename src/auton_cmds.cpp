@@ -23,13 +23,11 @@ constexpr int AUTON_BUDGET_MS = 14800;
 // false = the routine is NOT stopped by the budget: it runs until it finishes or the field / match
 // sim cuts it at 15 s. The budget is then only used for skip decisions (auton_time_left()).
 constexpr bool END_AT_BUDGET = false;
-// A move counts as "straight along an axis" when the other axis differs by less than this (inches).
-// Then that coordinate is kept where it is, so tuning error in the target can't make it curve.
-constexpr float AXIS_LOCK_TOL_IN = 1.5f;
-// Before a straight move, turn to the exact axis heading if the robot is more than this many degrees off.
-constexpr float ALIGN_TOL_DEG = 1.5f;
-// Skip the pre-turn for moves shorter than this (inches): too short to curve, not worth the time.
-constexpr float ALIGN_MIN_MOVE_IN = 3.0f;
+// IMU turn controller (face_heading). Per degree of error; the D term is per 10 ms loop.
+constexpr double TURN_KP = 2.0;
+constexpr double TURN_KD = 7.0;
+constexpr double TURN_MIN_POWER = 18.0;   // never push less than this while outside the tolerance (stops it stalling short)
+constexpr double TURN_TOL_DEG = 1.5;      // ends when this close to the heading
 // ---------------------------------------------------------------------------------
 
 uint32_t start_ms = 0;
@@ -56,7 +54,7 @@ void auton_cmds_reset() {
 	start_ms = pros::millis();
 	left_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
 	right_motors.set_brake_mode_all(pros::E_MOTOR_BRAKE_BRAKE);
-	if (auton_odom_ready()) chassis.setPose(0, 0, 0);   // the start spot is (0, 0), facing 0
+	if (auton_imu_ready()) imu.set_rotation(0);   // the start is heading 0
 }
 
 int auton_time_left() { return std::max(time_left(), 0); }
@@ -104,106 +102,73 @@ void drive_time(int speed, int ms) {
 	stop_drive();
 }
 
-// ============================= LemLib (odometry) ==================================
-// Each one blocks (async = false) so the routine still reads top to bottom.
-// E-STOP cancels the motion, which makes the call return.
+// ========================= IMU turns + encoder distances ==========================
+// No odometry: distance comes from the drive motor encoders, heading from the IMU. The IMU is
+// zeroed at the start of the auton (the robot starts facing heading 0), so headings are relative
+// to the start, clockwise positive.
 namespace {
-bool odom_ok(const char* name) {
-	auton_status(name);
-	if (auton_odom_ready()) return !stopped();
-	auton_status("NO ODOM: skipped");
-	return false;
+double enc_to_in(double deg) {
+	return deg / 360.0 * M_PI * drivetrain.wheelDiameter * (drivetrain.rpm / 600.0);
 }
-
-// Axis lock: a move that is straight along y keeps x where it is, and a move straight along x
-// keeps y where it is, so the robot drives dead straight instead of angling toward a slightly-off
-// other axis. Only when the other axis is off by less than AXIS_LOCK_TOL_IN; a real diagonal
-// move (bigger difference on both axes) goes to the target as written.
-// Returns true if the move is straight along an axis. Then, if the robot isn't already pointing
-// along that axis (within ALIGN_TOL_DEG), it turns to it first, so LemLib has no heading error
-// to steer out while driving (that steering is what curves a "straight" move).
-void axis_lock(float& x, float& y, bool forwards) {
-	lemlib::Pose p = chassis.getPose();
-	float dx = std::fabs(x - p.x), dy = std::fabs(y - p.y);
-	bool along_y;
-	if (dx < AXIS_LOCK_TOL_IN && dy >= dx) { x = p.x; along_y = true; }
-	else if (dy < AXIS_LOCK_TOL_IN && dx > dy) { y = p.y; along_y = false; }
-	else return;
-	if (std::max(dx, dy) < ALIGN_MIN_MOVE_IN) return;
-	// Heading of the front: 0 = +y, 90 = +x, 180 = -y, 270 = -x. Backing up faces the other way.
-	float h = along_y ? (y > p.y ? 0.0f : 180.0f) : (x > p.x ? 90.0f : 270.0f);
-	if (!forwards) h += 180.0f;
-	float err = std::fmod(h - (float)p.theta + 540.0f, 360.0f) - 180.0f;   // -180..180
-	if (std::fabs(err) > ALIGN_TOL_DEG && !stopped())
-		chassis.turnToHeading(h, cap(TURN_TIMEOUT_MS), {.maxSpeed = 100}, false);
+double drive_pos_in() {   // how far the robot has driven, average of both sides (+ = forward)
+	return (enc_to_in(left_motors.get_position()) + enc_to_in(right_motors.get_position())) / 2.0;
+}
+double wrap180(double a) {
+	a = std::fmod(a + 180.0, 360.0);
+	if (a < 0) a += 360.0;
+	return a - 180.0;
+}
+bool imu_ok(const char* name) {
+	auton_status(name);
+	if (auton_imu_ready()) return !stopped();
+	auton_status("NO IMU: skipped");
+	return false;
 }
 } // namespace
 
-void set_pose(float x, float y, float heading) {
-	if (odom_ok("set_pose")) chassis.setPose(x, y, heading);
-}
-
-void drive_to(float x, float y, int speed, int timeout_ms, float min_speed, float early_exit) {
-	if (odom_ok("drive_to")) {
-		axis_lock(x, y, true);
-		chassis.moveToPoint(x, y, cap(timeout_ms), {.forwards = true, .maxSpeed = (float)clamp_speed(speed), .minSpeed = min_speed, .earlyExitRange = early_exit}, false);
-	}
-}
-
-void back_to(float x, float y, int speed, int timeout_ms, float min_speed, float early_exit) {
-	if (odom_ok("back_to")) {
-		axis_lock(x, y, false);
-		chassis.moveToPoint(x, y, cap(timeout_ms), {.forwards = false, .maxSpeed = (float)clamp_speed(speed), .minSpeed = min_speed, .earlyExitRange = early_exit}, false);
-	}
-}
-
-// Back up in a dead-straight line for `inches`, holding the heading the robot has right now
-// (IMU steering, like drive_time) and measuring the distance with odometry. Face the way you
-// want to go first (face_heading), then call this. No path planning, so it can't curve.
-// With `heading` given it steers toward that absolute heading instead of holding the current
-// one, so you can start it before the turn has fully settled (face_heading with early_exit) and
-// it finishes the turn while driving: no pause, and it still ends on the exact heading.
-void back_dist(float inches, int speed, int timeout_ms, float heading) {
-	if (!odom_ok("back_dist")) return;
-	lemlib::Pose start = chassis.getPose();
-	double hold = imu.get_rotation();
-	const bool absolute = !std::isnan(heading);
-	uint32_t end = pros::millis() + timeout_ms;
-	while (pros::millis() < end && !stopped()) {
-		lemlib::Pose p = chassis.getPose();
-		double done = std::hypot(p.x - start.x, p.y - start.y);
-		double left_in = inches - done;
+// Straight line for `inches` (+ forward, - backward): distance from the encoders, IMU holds the
+// heading the robot had at the start. Eases in over the last 6".
+void drive_dist(float inches, int speed) {
+	if (!imu_ok(inches >= 0 ? "drive_dist" : "back_dist")) return;
+	const double sign = inches >= 0 ? 1.0 : -1.0;
+	const double start = drive_pos_in();
+	const double hold = imu.get_rotation();
+	while (!stopped()) {
+		double left_in = std::fabs(inches) - std::fabs(drive_pos_in() - start);
 		if (left_in <= 0.5) break;
 		int v = clamp_speed(speed);
-		if (left_in < 6.0) v = std::max(35, (int)(v * left_in / 6.0));   // ease in over the last 6"
-		double err = absolute ? std::fmod(heading - p.theta + 540.0, 360.0) - 180.0   // shortest way to the target, -180..180
-		                      : hold - imu.get_rotation();
-		int turn_part = (int)std::clamp(STRAIGHT_KP * err, -40.0, 40.0);
-		left_motors.move(std::clamp(-v + turn_part, -127, 127));
-		right_motors.move(std::clamp(-v - turn_part, -127, 127));
+		if (left_in < 6.0) v = std::max(35, (int)(v * left_in / 6.0));
+		int turn_part = (int)std::clamp(STRAIGHT_KP * (hold - imu.get_rotation()), -40.0, 40.0);
+		left_motors.move(std::clamp((int)(sign * v) + turn_part, -127, 127));
+		right_motors.move(std::clamp((int)(sign * v) - turn_part, -127, 127));
 		pros::delay(10);
 	}
 	stop_drive();
 }
+void back_dist(float inches, int speed) { drive_dist(-std::fabs(inches), speed); }
 
-void face(float x, float y, int speed, int timeout_ms) {
-	if (odom_ok("face"))
-		chassis.turnToPoint(x, y, cap(timeout_ms), {.maxSpeed = clamp_speed(speed)}, false);
+void set_heading(float heading) {
+	if (imu_ok("set_heading")) imu.set_rotation(heading);
 }
 
-void face_heading(float heading, int speed, int timeout_ms, float min_speed, float early_exit) {
-	if (odom_ok("face_heading"))
-		chassis.turnToHeading(heading, cap(timeout_ms), {.maxSpeed = clamp_speed(speed), .minSpeed = (int)min_speed, .earlyExitRange = early_exit}, false);
-}
-
-void drive_to_pose(float x, float y, float heading, int speed, int timeout_ms, float min_speed, float early_exit) {
-	if (odom_ok("drive_to_pose"))
-		chassis.moveToPose(x, y, heading, cap(timeout_ms), {.forwards = true, .maxSpeed = (float)clamp_speed(speed), .minSpeed = min_speed, .earlyExitRange = early_exit}, false);
-}
-
-void back_to_pose(float x, float y, float heading, int speed, int timeout_ms, float min_speed, float early_exit) {
-	if (odom_ok("back_to_pose"))
-		chassis.moveToPose(x, y, heading, cap(timeout_ms), {.forwards = false, .maxSpeed = (float)clamp_speed(speed), .minSpeed = min_speed, .earlyExitRange = early_exit}, false);
+// Turn in place to an IMU heading (shortest way). P + D on the heading error, with a minimum
+// push so it can't stall short of the target; ends within TURN_TOL_DEG.
+void face_heading(float heading, int speed) {
+	if (!imu_ok("face_heading")) return;
+	const uint32_t end = pros::millis() + TURN_TIMEOUT_MS;
+	double last_err = wrap180(heading - imu.get_rotation());
+	while (pros::millis() < end && !stopped()) {
+		double err = wrap180(heading - imu.get_rotation());
+		if (std::fabs(err) <= TURN_TOL_DEG) break;
+		double power = TURN_KP * err + TURN_KD * (err - last_err);
+		last_err = err;
+		power = std::clamp(power, -(double)clamp_speed(speed), (double)clamp_speed(speed));
+		if (std::fabs(power) < TURN_MIN_POWER) power = err > 0 ? TURN_MIN_POWER : -TURN_MIN_POWER;
+		left_motors.move((int)power);     // + = clockwise: left forward, right back
+		right_motors.move((int)-power);
+		pros::delay(10);
+	}
+	stop_drive();
 }
 
 // ================================== lift ==========================================
