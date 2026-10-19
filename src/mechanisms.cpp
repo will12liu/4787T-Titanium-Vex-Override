@@ -106,14 +106,24 @@ void lift_task_fn() {
 				}
 				cascade_move(v);
 			}
+			static uint32_t last_dbg = 0;   // 4x a second: on the Brain screen (row 4) and the terminal
+			if (pros::millis() - last_dbg > 250) {
+				last_dbg = pros::millis();
+				pros::screen::print(pros::E_TEXT_MEDIUM, 4, "lift goal %5.0f pos %5.0f err %5.0f %s   ", lift_goal_deg, lift_pos(), err, holding ? "HOLD" : "go");
+				printf("DBG lift goal=%.0f pos=%.0f err=%.0f holding=%d\n", lift_goal_deg, lift_pos(), err, (int)holding);
+			}
 		}
 		pros::delay(10);
 	}
 }
 } // namespace
 
+void lift_task_start() {
+	static pros::Task lift_task(lift_task_fn);   // starts once; later calls do nothing
+}
+
 void lift_to(double deg, int velocity) {
-	static pros::Task lift_task(lift_task_fn);   // started the first time the lift is aimed
+	lift_task_start();   // normally already running from initialize()
 	lift_max_volt = std::clamp((int)(velocity * 127 / 200), 20, 127);   // 200 rpm = full power
 	lift_goal_deg = deg;
 	lift_active = true;

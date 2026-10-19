@@ -67,7 +67,15 @@ void run_auton(bool macro) {
 	left_motors.move(0);
 	right_motors.move(0);
 	mech_stop_all();
+	char step[24];   // the last command, saved before the final status message overwrites it
+	snprintf(step, sizeof(step), "%s", auton_last_step());
+	int step_ms = auton_last_step_ms();
 	auton_status(estop_triggered() ? "E-STOPPED" : auton_out_of_time() ? "TIME UP" : "end");
+	// Why did it stop, and where? Shown on the controller (line 3) so you don't need a terminal:
+	// reason, the last command that started, and when it started.
+	pros::Controller(pros::E_CONTROLLER_MASTER).print(2, 0, "%-5s %-9.9s %4.1fs",
+	    estop_triggered() ? "ESTOP" : auton_out_of_time() ? "TIME" : "done",
+	    step, step_ms / 1000.0);
 }
 } // namespace
 

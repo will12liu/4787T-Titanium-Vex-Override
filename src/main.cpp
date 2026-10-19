@@ -74,6 +74,7 @@ void initialize() {
 	});
 
 	mech_init();             // tare lift + claw flip, set brake modes. Lift must be fully down.
+	lift_task_start();       // background lift task (lift_to / lift_to_rot) runs from boot
 	auton_selector_start();  // LEFT / RIGHT buttons on the Brain + controller D-pad
 	auton_init();            // find IMU, calibrate LemLib chassis (blocks ~2-3 s)
 	tuning_start();          // TUNE button on the Brain: PID + sensor tuning

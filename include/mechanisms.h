@@ -48,8 +48,8 @@ constexpr double LIFT_ROT_TO_LIFT = 1.0;
 constexpr double LIFT_HOLD_BAND_DEG = 6.0;     // stop correcting once this close
 constexpr double LIFT_RECORRECT_DEG = 14.0;    // start correcting again once this far off
 constexpr int LIFT_UNDER_MIN_VOLT = 40;        // min push going up (against gravity)
-constexpr int LIFT_OVER_MIN_VOLT = 15;         // min push going down
-constexpr int LIFT_OVER_MAX_VOLT = 60;         // cap going down so it can't slam / bounce back up
+constexpr int LIFT_OVER_MIN_VOLT = 30;         // min push going down (was 15: too weak to start it moving)
+constexpr int LIFT_OVER_MAX_VOLT = 100;        // cap going down (was 60: too weak for the auton clamp). L2 uses 85
 constexpr double LIFT_DOWN_DEG = 10.0;   // = LIFT_LIMIT_BOTTOM_DEG, the lowest sensor reading
 // Hard travel limits in lift_pos() units (the "rot" number on the tuning screen). Measured:
 // lowest = 10, highest = -1444, so on this sensor the number goes DOWN as the lift goes up.
@@ -86,6 +86,10 @@ void mech_init();
 // either end and eases off near them. Every cascade command goes through this, never cascade.move().
 // If the rotation sensor is unplugged it can't tell where the lift is, so it doesn't limit.
 void cascade_move(int voltage);
+
+// Start the background lift task. Call once from initialize() so it is already running before
+// the first lift_to() (the auton creates it from inside its own task otherwise).
+void lift_task_start();
 
 // Lift. lift_to() is non-blocking; lift_wait() blocks until within tol or timeout.
 // lift_pos() = lift position from the cascade rotation sensor (motor counts drift).

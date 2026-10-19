@@ -41,7 +41,7 @@ lemlib::ControllerSettings lateral_controller(
     3,    // kD
     3,    // anti-windup range
     1,    // small error range (inches)
-    100,  // small error timeout (ms)
+    0,    // small error timeout (ms): 0 = ends the instant it is inside the small range, no settle wait
     3,    // large error range (inches)
     500,  // large error timeout (ms)
     0     // max acceleration slew
@@ -55,7 +55,7 @@ lemlib::ControllerSettings angular_controller(
     7,    // kD (tuned on the TUNE screen 10/13, was 10)
     3,    // anti-windup range
     1,    // small error range (degrees)
-    100,  // small error timeout (ms)
+    0,    // small error timeout (ms): 0 = ends the instant it is inside the small range, no settle wait
     3,    // large error range (degrees)
     500,  // large error timeout (ms)
     0     // max acceleration slew
