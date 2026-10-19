@@ -13,7 +13,9 @@ bool auton_odom_ready();
 bool auton_imu_ready();
 
 // The routine itself, written in src/routine.cpp.
-void run_routine();
+void run_routine();      // picks routine_right() or routine_left() from the selector
+void routine_right();
+void routine_left();
 
 // Practice a real match without a competition switch: runs run_routine() in its own task for
 // 15 s (hard cut-off, like the field), then returns so driver control continues.
