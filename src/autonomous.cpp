@@ -1,15 +1,11 @@
 #include "main.h"
 #include "robot-config.h"
 #include "mechanisms.h"
-#include "auton_selector.h"
 #include "auton.h"
 #include "auton_cmds.h"
 #include "estop.h"
 
-// =============================================================================
-// Auton startup + entry point. The routine you edit is in src/routine.cpp and the
-// commands it uses (back_to, face_heading, ...) are in src/auton_cmds.cpp.
-// =============================================================================
+// Startup, practice modes, and cleanup. Field steps live in routine.cpp.
 
 namespace {
 bool imu_ready = false;
@@ -50,7 +46,7 @@ void auton_init() {
 bool auton_imu_ready() { return imu_ready; }
 
 // True once LemLib odometry is running. The TUNE screen and the LemLib auton
-// commands (drive_to, face, ...) need it.
+// driving commands need it.
 bool auton_odom_ready() { return odom_ready; }
 
 namespace {
@@ -81,8 +77,7 @@ void run_auton(bool macro) {
 
 void autonomous() { run_auton(false); }
 
-// Driver-control macro: runs the routine from the opcontrol task. Legal in driver control (the
-// rules only forbid driver input during the autonomous period). Blocks until done; L1 + R1 cancels.
+// Driver-control macro: blocks until finished or L1 + R1 cancels.
 void auton_macro() { run_auton(true); }
 
 // Match simulation for practice without a competition switch. Runs autonomous() the way the field
@@ -101,11 +96,15 @@ void autonomous_match_sim() {
 	while (!done && pros::millis() - start < AUTON_MS) pros::delay(10);
 	if (!done) {   // the field would have killed it here
 		auton_task.remove();
+		char step[24];
+		snprintf(step, sizeof(step), "%s", auton_last_step());
 		chassis.cancelAllMotions();   // a killed LemLib move leaves its state set
 		left_motors.move(0);
 		right_motors.move(0);
 		mech_stop_all();
 		auton_status("CUT OFF at 15s");
+		pros::Controller(pros::E_CONTROLLER_MASTER).print(2, 0, "15s %-18.18s", step);
+		printf("DBG 15s cutoff: step=%s lift_pos=%.0f\n", step, lift_pos());
 	}
 	pros::Controller(pros::E_CONTROLLER_MASTER).rumble("-");   // auton over, driver control
 }

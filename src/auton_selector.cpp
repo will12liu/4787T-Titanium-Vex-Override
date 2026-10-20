@@ -68,13 +68,11 @@ void selector_task_fn() {
 			}
 		}
 
-		// Controller: D-pad LEFT / RIGHT for side, X for colour (D-pad UP is the aux
-		// pistons in driver control). Only while not actually running autonomous.
+		// Controller: D-pad Left / Right selects the side outside autonomous.
 		if (!pros::competition::is_autonomous()) {
 			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) selected = AutonSide::LEFT;
 			if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) selected = AutonSide::RIGHT;
-			// X is the claw's score button in driver control, so only read it while
-			// disabled (new-press flags are shared, opcontrol would lose X presses).
+			// X changes colour while disabled.
 			if (pros::competition::is_disabled() &&
 			    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X)) {
 				selected_color = selected_color == AutonColor::RED ? AutonColor::BLUE : AutonColor::RED;
