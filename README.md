@@ -21,17 +21,21 @@ PROS + LemLib robot program. Start with the lift fully down before powering on.
 `run_routine()` selects the path, then:
 
 1. Raises the lift while hitting the toggle. A second hit is skipped when time is short.
-2. Approaches the goal, clamps down for 900 ms, and starts opening the claw at full power.
-   After 250 ms, switches to R1's grab power and pulls away without an alignment turn.
+2. Approaches the goal, clamps down for 900 ms, and starts opening the claw with driver control's release power (85).
+   Keeps opening through the 500 ms pause, then pulls away without raising the cascade.
+   Pulls away without an alignment turn, returns the cascade to -70 degrees and waits for it to arrive,
+   then starts R1's grab power and continues toward intake.
    Both scoring approaches gradually reduce drive power from 100 toward 25 over the last 8 inches.
    If progress stops for 250 ms in that zone, the drive stops instead of pushing until its timeout.
-3. Pulls away, turns, and completes the original backward drive while R1 resets the claw.
-4. Reverses another 9.75 inches slowly while grabbing with R1's claw power.
+3. After pulling away and reaching intake height, turns and completes the original backward drive while grabbing.
+4. Reverses another 11.75 inches slowly at power 35 while grabbing with R1's claw power.
    Keeps grabbing through the turn and second scoring approach until the final release.
-5. Raises the lift to -450 first, waits for it to arrive, pauses for 100 ms, then turns left 133 degrees
+5. Raises the lift to -450 first, waits for it to arrive, pauses for 100 ms, then turns 133 degrees
+   (left on the right path, right on the left path)
    and drives backward 23 inches with the pin raised,
    then commands -365 once it reaches the target or stalls in the final 8-inch slowdown zone.
-   Waits for -365, pauses for 100 ms, and releases at full power for 1500 ms.
+   Waits for -365, pauses for 100 ms, and starts continuous release at driver control's power.
+   Waits 1500 ms before autonomous cleanup stops the mechanisms.
    A drive timeout, E-STOP, missing odometry, or a lift wait over 2 seconds ends the step without releasing.
 
 Distances are inches. Heading 0 faces the starting direction; clockwise is positive.
