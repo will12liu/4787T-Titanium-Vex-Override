@@ -32,7 +32,7 @@ void wait(int ms);  // Interruptible by E-STOP.
 // Lift starts moving in the background. Timed claw commands spin for ms, then stop.
 void lift_to_rot(double rotation);
 void claw_grab(int ms);  // Same power as R1; ms <= 0 starts it without waiting or stopping.
-void claw_release(int ms, int power);  // Opening power [0, 127]; ms <= 0 starts without waiting.
+void claw_release(int ms);  // One R2 toggle; ms <= 0 leaves the selected mode running.
 
 bool on_right();
 bool is_blue();

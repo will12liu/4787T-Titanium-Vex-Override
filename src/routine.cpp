@@ -31,10 +31,9 @@ constexpr int SCORE_DRIVE_TIMEOUT_MS = auton_move_time(4000);
 constexpr int SCORE_SETTLE_MS = 200;
 constexpr int SCORE_RELEASE_PAUSE_MS = 500;  // Let the pin clear before pulling away after either score.
 constexpr int CLAW_RELEASE_MS = 1500;
-constexpr int CLAW_RELEASE_POWER = 127;  // Full power for opening under load.
-constexpr int CLAMP_DOWN_POWER = 85;
+constexpr int CLAMP_DOWN_POWER = 60;
 constexpr int CLAMP_PUSH_MS = 900;
-constexpr int CLAMP_HOLD_POWER = 40;
+constexpr int CLAMP_HOLD_POWER = 30;
 
 // Exit: pull forward from the goal, turn 60 degrees, then intake backward toward -y.
 constexpr int EXIT_LOWER_TIMEOUT_MS = 4000;
@@ -186,6 +185,9 @@ void run_routine() {
 	// 3. Pull forward from the goal, then turn right/left 60 degrees for intake.
 	// Start moving away without an automatic alignment turn at the goal.
 	drive_to(side.pull_away_x, SCORE_Y, DRIVE_SPEED, DRIVE_TIMEOUT_MS, false);
+	lift_to_rot(FIRST_SCORE_RETURN_LIFT_ROT);  // Return to intake height once clear of the first goal.
+	if (!wait_for_lift(FIRST_SCORE_RETURN_LIFT_ROT)) return;
+	claw_grab(0);  // Start intake only after reaching -70; keep grabbing until the second release.
 	wait(PAUSE_MS);
 	if (auton_stopped()) return;
 	if (!auton_odom_ready()) {
@@ -206,6 +208,7 @@ void run_routine() {
 	back_dist(exit_distance, DRIVE_SPEED);
 	if (!wait_for_bottom(lower_start_ms)) return;
 
+	/* Temporarily disabled: slow intake and the remainder of the routine.
 	// 4. Keep R1 running during the slow intake and second scoring approach.
 	back_dist(EXIT_SLOW_BACK_IN, EXIT_SLOW_BACK_SPEED, EXIT_SLOW_BACK_TIMEOUT_MS);
 

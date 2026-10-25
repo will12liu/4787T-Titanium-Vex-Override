@@ -270,17 +270,19 @@ void lift_to_rot(double rotation) {
 void claw_grab(int ms) {
 	auton_status("claw_grab");
 	if (auton_stopped()) return;
-	claw_spin.move(CLAW_GRAB_SPEED);
+	claw_grab_toggle();
+	claw_driver_update();
 	if (ms <= 0) return;  // Leave it running while another move executes.
 	wait(ms);
-	claw_spin.move(0);
+	claw_driver_reset();
 }
 
-void claw_release(int ms, int power) {
+void claw_release(int ms) {
 	auton_status("claw_release");
 	if (auton_stopped()) return;
-	claw_spin.move(std::clamp(power, 0, 127));
+	claw_release_toggle();  // Exactly one R2 press, including toggling off if already releasing.
+	claw_driver_update();
 	if (ms <= 0) return;  // Keep opening while the routine continues.
 	wait(ms);
-	claw_spin.move(0);
+	claw_driver_reset();
 }

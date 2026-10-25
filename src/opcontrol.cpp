@@ -10,6 +10,7 @@ void opcontrol() {
 	printf("DBG opcontrol start\n");
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 	int drive_direction = -1;
+	bool cascade_preset_active = false;
 	// Ramp direction changes to avoid suddenly reversing the motors.
 	double drive_scale = 1.0;
 	const double DIRECTION_RAMP_STEP = 0.25;   // per 20 ms loop: full flip takes ~160 ms
@@ -25,12 +26,14 @@ void opcontrol() {
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)) {
 			autonomous_match_sim();
 			claw_driver_reset();
+			cascade_preset_active = false;
 		}
 		// B + Y: run the routine during driver control. L1 + R1 cancels.
 		if (!tuning_active() && master.get_digital(pros::E_CONTROLLER_DIGITAL_B) &&
 		    master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)) {
 			auton_macro();
 			claw_driver_reset();
+			cascade_preset_active = false;
 		}
 		// D-pad Up reverses the driving direction; turning stays the same.
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP)) {
@@ -65,8 +68,8 @@ void opcontrol() {
 		}
 
 		// Ignore lift/grab input while the E-STOP combo is held.
-		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_L1) &&
-		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
+		bool estop_combo = master.get_digital(pros::E_CONTROLLER_DIGITAL_X) &&
+		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_A);
 
 		// R1 toggles the claw GRAB, R2 or A toggles the claw RELEASE (see claw_driver_update).
 		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {

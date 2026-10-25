@@ -1,6 +1,7 @@
 #include "mechanisms.h"
 #include <cmath>
 #include <algorithm>
+#include <atomic>
 
 void mech_init() {
 	cascade.tare_position_all();   // Apply setup to every lift motor.
@@ -11,7 +12,9 @@ void mech_init() {
 
 namespace {
 enum class ClawMode { STOPPED, GRAB, RELEASE };
-ClawMode claw_mode = ClawMode::STOPPED;
+std::atomic<ClawMode> claw_mode{ClawMode::STOPPED};
+std::atomic<bool> claw_auton_active{false};
+pros::Mutex claw_auton_mutex;
 }
 
 void claw_grab_toggle() {
@@ -35,6 +38,21 @@ void claw_driver_update() {
 void claw_driver_reset() {
 	claw_mode = ClawMode::STOPPED;
 	claw_spin.move(0);
+}
+
+void claw_auton_start() {
+	claw_auton_mutex.take();
+	claw_driver_reset();
+	claw_auton_active = true;
+	claw_auton_mutex.give();
+	static pros::Task claw_task([]() {
+		while (true) {
+			claw_auton_mutex.take();
+			if (claw_auton_active) claw_driver_update();
+			claw_auton_mutex.give();
+			pros::delay(20);
+		}
+	});
 }
 
 // Lift height from the rotation sensor on the middle axis, so motor slip can't throw it off.
@@ -127,6 +145,9 @@ void lift_release() {
 
 void mech_stop_all() {
 	lift_release();
-	claw_spin.move(0);
+	claw_auton_mutex.take();
+	claw_auton_active = false;
+	claw_driver_reset();
+	claw_auton_mutex.give();
 	cascade.move(0);
 }

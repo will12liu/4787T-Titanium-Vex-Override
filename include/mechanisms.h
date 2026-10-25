@@ -9,6 +9,7 @@ void claw_release_toggle();
 bool claw_is_grabbing();
 void claw_driver_update();  // Apply the selected mode each driver loop.
 void claw_driver_reset();
+void claw_auton_start();  // Run the driver's claw update every 20 ms during autonomous.
 
 // Lift sensor readings decrease as the lift rises. Start fully down before powering on.
 constexpr double LIFT_ROT_TO_LIFT = 1.0;
