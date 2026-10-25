@@ -13,6 +13,9 @@ void opcontrol() {
 	// Ramp direction changes to avoid suddenly reversing the motors.
 	double drive_scale = 1.0;
 	const double DIRECTION_RAMP_STEP = 0.25;   // per 20 ms loop: full flip takes ~160 ms
+	constexpr int DRIVER_TURN_POWER = 100;
+	constexpr double INTAKE_LIFT_ROT = 1.0;
+	bool intake_lift_active = false;
 	master.print(2, 0, "DRIVE: FWD");
 	cascade.set_brake_mode_all(CASCADE_BRAKE_MODE);
 
@@ -46,6 +49,7 @@ void opcontrol() {
 		if (std::abs(dir) < 10) dir = 0;
 		if (std::abs(turn) < 10) turn = 0;
 		dir = (int)std::lround(dir * drive_scale);
+		turn = (int)std::lround(turn * DRIVER_TURN_POWER / 127.0);
 		// Anti-tip: the higher the lift, the less drive power.
 		double tip_scale = lift_drive_scale();
 		dir = (int)std::lround(dir * tip_scale);
@@ -65,17 +69,29 @@ void opcontrol() {
 		                   master.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
 
 		// R1 toggles the claw GRAB, R2 or A toggles the claw RELEASE (see claw_driver_update).
-		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) claw_grab_toggle();
+		if (master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) && !estop_combo) {
+			claw_grab_toggle();
+			if (claw_is_grabbing()) {
+				lift_to(INTAKE_LIFT_ROT);
+				intake_lift_active = true;
+			}
+		}
 		if ((master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2) ||
 		     master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) && !estop_combo) claw_release_toggle();
 
-		// L1 raises, L2 lowers; the E-STOP combo blocks both.
-		lift_release();
+		if (estop_combo || !claw_is_grabbing()) intake_lift_active = false;
+
+		// Manual lift input overrides the intake target until intake is toggled on again.
 		if (!estop_combo && master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+			intake_lift_active = false;
+			lift_release();
 			cascade_move(127);
 		} else if (!estop_combo && master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+			intake_lift_active = false;
+			lift_release();
 			cascade_move(-85);
-		} else {
+		} else if (!intake_lift_active) {
+			lift_release();
 			cascade_move(0);
 		}
 

@@ -66,12 +66,17 @@ void run_auton(bool macro) {
 	char step[24];   // the last command, saved before the final status message overwrites it
 	snprintf(step, sizeof(step), "%s", auton_last_step());
 	int step_ms = auton_last_step_ms();
-	auton_status(estop_triggered() ? "E-STOPPED" : auton_out_of_time() ? "TIME UP" : "end");
+	const char* failure = auton_failure();
+	auton_status(estop_triggered() ? "E-STOPPED" : auton_out_of_time() ? "TIME UP" : failure[0] ? failure : "end");
 	// Why did it stop, and where? Shown on the controller (line 3) so you don't need a terminal:
 	// reason, the last command that started, and when it started.
-	pros::Controller(pros::E_CONTROLLER_MASTER).print(2, 0, "%-5s %-9.9s %4.1fs",
-	    estop_triggered() ? "ESTOP" : auton_out_of_time() ? "TIME" : "done",
-	    step, step_ms / 1000.0);
+	if (!estop_triggered() && !auton_out_of_time() && failure[0]) {
+		pros::Controller(pros::E_CONTROLLER_MASTER).print(2, 0, "ERR %-15.15s", failure);
+	} else {
+		pros::Controller(pros::E_CONTROLLER_MASTER).print(2, 0, "%-5s %-9.9s %4.1fs",
+		    estop_triggered() ? "ESTOP" : auton_out_of_time() ? "TIME" : "done",
+		    step, step_ms / 1000.0);
+	}
 }
 } // namespace
 

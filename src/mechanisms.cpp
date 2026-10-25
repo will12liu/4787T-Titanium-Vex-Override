@@ -22,6 +22,10 @@ void claw_release_toggle() {
 	claw_mode = claw_mode == ClawMode::RELEASE ? ClawMode::STOPPED : ClawMode::RELEASE;
 }
 
+bool claw_is_grabbing() {
+	return claw_mode == ClawMode::GRAB;
+}
+
 void claw_driver_update() {
 	if (claw_mode == ClawMode::RELEASE) claw_spin.move(CLAW_RELEASE_SPEED);
 	else if (claw_mode == ClawMode::GRAB) claw_spin.move(CLAW_GRAB_SPEED);

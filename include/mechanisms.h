@@ -6,6 +6,7 @@ constexpr int CLAW_GRAB_SPEED = -127;
 constexpr int CLAW_RELEASE_SPEED = 85;
 void claw_grab_toggle();
 void claw_release_toggle();
+bool claw_is_grabbing();
 void claw_driver_update();  // Apply the selected mode each driver loop.
 void claw_driver_reset();
 
